@@ -93,25 +93,6 @@ def gen_event_code():
 TAX_RATES = {'no_tax': 0.0, 'vat18': 0.18}
 
 
-def totals_from_subtotal(subtotal, tax_inclusive, tax_type, discount_amount):
-    subtotal = float(subtotal or 0)
-    discount_amount = float(discount_amount or 0)
-    rate = TAX_RATES.get(tax_type, 0.0)
-    taxable_base = subtotal - discount_amount
-    if tax_inclusive:
-        tax_amount = taxable_base - (taxable_base / (1 + rate)) if rate else 0.0
-        total = taxable_base
-    else:
-        tax_amount = taxable_base * rate
-        total = taxable_base + tax_amount
-    return {
-        'subtotal': round(subtotal, 2),
-        'discount_amount': round(discount_amount, 2),
-        'tax_amount': round(tax_amount, 2),
-        'total': round(total, 2),
-    }
-
-
 def compute_totals(products, tax_inclusive, tax_type, discount_amount):
     subtotal = 0.0
     for p in products:
@@ -119,7 +100,26 @@ def compute_totals(products, tax_inclusive, tax_type, discount_amount):
         qty = p.get('qty') or 1
         unit_price = p.get('unit_price') or 0
         subtotal += float(days) * float(qty) * float(unit_price)
-    return totals_from_subtotal(subtotal, tax_inclusive, tax_type, discount_amount)
+
+    discount_amount = float(discount_amount or 0)
+    rate = TAX_RATES.get(tax_type, 0.0)
+
+    if tax_inclusive:
+        # tax is already baked into unit prices
+        taxable_base = subtotal - discount_amount
+        tax_amount = taxable_base - (taxable_base / (1 + rate)) if rate else 0.0
+        total = taxable_base
+    else:
+        taxable_base = subtotal - discount_amount
+        tax_amount = taxable_base * rate
+        total = taxable_base + tax_amount
+
+    return {
+        'subtotal': round(subtotal, 2),
+        'discount_amount': round(discount_amount, 2),
+        'tax_amount': round(tax_amount, 2),
+        'total': round(total, 2),
+    }
 
 
 @app.route('/')
@@ -197,28 +197,15 @@ def _serialize_event_row(row):
 
 @app.route('/api/events', methods=['GET'])
 def get_events():
-    # Calendar list; includes pre-computed totals so the popup can show the
-    # amount instantly without a second request.
+    # Lightweight list for the calendar (no product line items).
     conn = get_db()
     rows = conn.execute('''
         SELECT events.*, clients.name as client_name
         FROM events LEFT JOIN clients ON events.client_id = clients.id
         ORDER BY date
     ''').fetchall()
-    sub_rows = conn.execute('''
-        SELECT event_id, COALESCE(SUM(days * qty * unit_price), 0) AS subtotal
-        FROM event_products GROUP BY event_id
-    ''').fetchall()
     conn.close()
-    subtotals = {r['event_id']: r['subtotal'] for r in sub_rows}
-    out = []
-    for r in rows:
-        d = _serialize_event_row(r)
-        d['totals'] = totals_from_subtotal(
-            subtotals.get(d['id'], 0), bool(d.get('tax_inclusive')),
-            d.get('tax_type') or 'no_tax', d.get('discount_amount') or 0)
-        out.append(d)
-    return jsonify(out)
+    return jsonify([_serialize_event_row(r) for r in rows])
 
 
 @app.route('/api/events/<int:event_id>', methods=['GET'])
