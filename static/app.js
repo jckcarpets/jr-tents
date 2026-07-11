@@ -322,24 +322,50 @@ function ensureTotals(ev) {
   return ev;
 }
 
+let popupFetch = null;   // in-flight fetch of the full event (products etc.)
+
+function renderPopupFields(ev, totalText) {
+  document.getElementById('ep-color-bar').style.background = ev.color || '#e0793d';
+  document.getElementById('ep-client').textContent = ev.client_name || ev.title;
+  document.getElementById('ep-date').textContent = formatDateRange(ev);
+  document.getElementById('ep-location').textContent = ev.location || '—';
+  document.getElementById('ep-total').textContent = totalText;
+}
+
 function openEventPopup(eventId) {
-  api(`/api/events/${eventId}`).then(ev => {
+  // Show the popup INSTANTLY from the data the calendar already has —
+  // no waiting on the network. The full record (products, exact totals)
+  // loads in the background and fills in the total when it arrives.
+  const cached = events.find(e => e.id === eventId);
+  if (cached) {
+    if (!cached.totals && cached.products) ensureTotals(cached);
+    popupEvent = cached;
+    const currency = cached.discount_currency || 'UGX';
+    renderPopupFields(
+      cached,
+      cached.totals ? `${formatMoney(cached.totals.total)} ${currency}` : '…'
+    );
+    document.getElementById('event-popup').classList.remove('hidden');
+  }
+
+  popupFetch = api(`/api/events/${eventId}`).then(ev => {
     ensureTotals(ev);
     popupEvent = ev;
-    document.getElementById('ep-color-bar').style.background = ev.color || '#e0793d';
-    document.getElementById('ep-client').textContent = ev.client_name || ev.title;
-    document.getElementById('ep-date').textContent = formatDateRange(ev);
-    document.getElementById('ep-location').textContent = ev.location || '—';
-    const currency = ev.discount_currency || 'UGX';
-    document.getElementById('ep-total').textContent =
-      `${formatMoney((ev.totals && ev.totals.total) || 0)} ${currency}`;
-    document.getElementById('event-popup').classList.remove('hidden');
-  }).catch(e => toast(e.message));
+    // update popup if it's still open on this event
+    if (!document.getElementById('event-popup').classList.contains('hidden')) {
+      const currency = ev.discount_currency || 'UGX';
+      renderPopupFields(ev, `${formatMoney(ev.totals.total)} ${currency}`);
+    }
+    if (!cached) document.getElementById('event-popup').classList.remove('hidden');
+    return ev;
+  }).catch(e => {
+    toast(e.message);
+    return null;
+  });
 }
 
 function closeEventPopup() {
   document.getElementById('event-popup').classList.add('hidden');
-  popupEvent = null;
 }
 
 document.getElementById('ep-close').addEventListener('click', closeEventPopup);
@@ -348,10 +374,11 @@ document.getElementById('event-popup').addEventListener('click', (e) => {
 });
 
 document.getElementById('ep-more').addEventListener('click', () => {
-  if (!popupEvent) return;
-  const ev = popupEvent;
   closeEventPopup();
-  openEventDetail(ev);
+  // Use the background fetch (usually already finished by the time the
+  // user clicks More) so the detail page has the full product list.
+  const pending = popupFetch || Promise.resolve(popupEvent);
+  pending.then(ev => { if (ev) openEventDetail(ev); });
 });
 
 function openEventDetail(ev) {

@@ -45,7 +45,6 @@ button, input, select, textarea { font-family: inherit; }
 
 /* Collapsed (desktop): the sidebar slides fully out of view */
 body.sidebar-collapsed .sidebar { margin-left: -240px; }
-body.sidebar-collapsed .main { padding-left: 64px; }
 
 /* Minimise button inside the sidebar */
 .sidebar-min {
@@ -65,12 +64,12 @@ body.sidebar-collapsed .main { padding-left: 64px; }
 
 .sidebar-min:hover { background: rgba(255,255,255,0.3); }
 
-/* Floating hamburger — appears when the sidebar is hidden */
+/* Floating hamburger — appears when the sidebar is hidden (bottom left) */
 .sidebar-toggle {
   display: none;
   position: fixed;
-  top: 12px;
-  left: 12px;
+  bottom: 18px;
+  left: 14px;
   z-index: 60;
   width: 40px;
   height: 40px;
@@ -114,6 +113,16 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
 
 .brand-logo svg { display: block; width: 100%; height: auto; }
 
+.brand-suite {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: 0.32em;
+  margin-top: 2px;
+  text-indent: 0.32em; /* balances the letter-spacing so it centers true */
+}
+
 .brand-details {
   border-top: 2px solid var(--navy);
   margin-top: 6px;
@@ -123,6 +132,24 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   color: var(--navy);
   font-weight: 700;
   line-height: 1.5;
+}
+
+/* Brand banner above the calendar — phones only (desktop has the sidebar) */
+.mobile-brand {
+  display: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px 7px;
+  margin-bottom: 10px;
+}
+
+.mobile-brand svg {
+  display: block;
+  width: 210px;
+  max-width: 80%;
+  height: auto;
+  margin: 0 auto;
 }
 
 .brand-phone { font-size: 12px; letter-spacing: 0.02em; }
@@ -921,9 +948,11 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .sidebar-toggle { display: flex; }
   body.sidebar-open .sidebar-toggle { display: none; }
 
+  .mobile-brand { display: block; }
+
   /* Calendar uses the full phone screen: slim page padding and tighter
      cells so the whole month spans edge-to-edge without clipping */
-  .main { padding: 60px 5px 12px 5px; }
+  .main { padding: 12px 5px 70px 5px; }
   body.sidebar-collapsed .main { padding-left: 5px; }
 
   .calendar { border-radius: 6px; }
@@ -967,7 +996,7 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   }
 
   /* Event detail page: compact type so everything fits a phone screen */
-  .breadcrumb { margin: -60px -5px 18px -5px; padding: 12px 14px 12px 60px; font-size: 12.5px; }
+  .breadcrumb { margin: -12px -5px 18px -5px; padding: 12px 14px; font-size: 12.5px; }
   .form-heading { font-size: 16px; margin: 20px 0 10px 0; }
 
   .detail-info { max-width: 100%; gap: 5px; }

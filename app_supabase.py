@@ -24,6 +24,7 @@ from decimal import Decimal
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 
 app = Flask(__name__)
 
@@ -36,9 +37,49 @@ if not DB_URL:
     )
 
 
+_POOL = None
+
+
+def _pool():
+    global _POOL
+    if _POOL is None:
+        _POOL = psycopg2.pool.ThreadedConnectionPool(
+            1, 4, DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    return _POOL
+
+
 def get_db():
-    conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    return conn
+    """Borrow a pooled connection (much faster than opening a new one per
+    request). A quick ping validates it; dead connections are replaced."""
+    for _ in range(2):
+        try:
+            conn = _pool().getconn()
+        except Exception:
+            break
+        try:
+            with conn.cursor() as cur:
+                cur.execute('SELECT 1')
+            conn.rollback()
+            return conn
+        except Exception:
+            try:
+                _pool().putconn(conn, close=True)
+            except Exception:
+                pass
+    # last resort: direct connection
+    return psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+def put_db(conn):
+    """Return a connection to the pool (used instead of closing it)."""
+    try:
+        conn.rollback()
+        _pool().putconn(conn)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def _clean(value):
@@ -63,17 +104,10 @@ def gen_event_code():
 TAX_RATES = {'no_tax': 0.0, 'vat18': 0.18}
 
 
-def compute_totals(products, tax_inclusive, tax_type, discount_amount):
-    subtotal = 0.0
-    for p in products:
-        days = p.get('days') or 1
-        qty = p.get('qty') or 1
-        unit_price = p.get('unit_price') or 0
-        subtotal += float(days) * float(qty) * float(unit_price)
-
+def totals_from_subtotal(subtotal, tax_inclusive, tax_type, discount_amount):
+    subtotal = float(subtotal or 0)
     discount_amount = float(discount_amount or 0)
     rate = TAX_RATES.get(tax_type, 0.0)
-
     taxable_base = subtotal - discount_amount
     if tax_inclusive:
         tax_amount = taxable_base - (taxable_base / (1 + rate)) if rate else 0.0
@@ -81,13 +115,22 @@ def compute_totals(products, tax_inclusive, tax_type, discount_amount):
     else:
         tax_amount = taxable_base * rate
         total = taxable_base + tax_amount
-
     return {
         'subtotal': round(subtotal, 2),
         'discount_amount': round(discount_amount, 2),
         'tax_amount': round(tax_amount, 2),
         'total': round(total, 2),
     }
+
+
+def compute_totals(products, tax_inclusive, tax_type, discount_amount):
+    subtotal = 0.0
+    for p in products:
+        days = p.get('days') or 1
+        qty = p.get('qty') or 1
+        unit_price = p.get('unit_price') or 0
+        subtotal += float(days) * float(qty) * float(unit_price)
+    return totals_from_subtotal(subtotal, tax_inclusive, tax_type, discount_amount)
 
 
 @app.route('/')
@@ -103,7 +146,7 @@ def get_clients():
     with conn.cursor() as cur:
         cur.execute('SELECT * FROM clients ORDER BY lower(name)')
         rows = cur.fetchall()
-    conn.close()
+    put_db(conn)
     return jsonify([clean_row(r) for r in rows])
 
 
@@ -113,7 +156,7 @@ def get_client(client_id):
     with conn.cursor() as cur:
         cur.execute('SELECT * FROM clients WHERE id=%s', (client_id,))
         row = cur.fetchone()
-    conn.close()
+    put_db(conn)
     if not row:
         return jsonify({'error': 'not found'}), 404
     return jsonify(clean_row(row))
@@ -134,7 +177,7 @@ def create_client():
         )
         new_id = cur.fetchone()['id']
     conn.commit()
-    conn.close()
+    put_db(conn)
     return jsonify({'id': new_id}), 201
 
 
@@ -151,7 +194,7 @@ def update_client(client_id):
             (name, data.get('phone'), data.get('email'), data.get('address'), data.get('notes'), client_id)
         )
     conn.commit()
-    conn.close()
+    put_db(conn)
     return jsonify({'status': 'ok'})
 
 
@@ -161,7 +204,7 @@ def delete_client(client_id):
     with conn.cursor() as cur:
         cur.execute('DELETE FROM clients WHERE id=%s', (client_id,))
     conn.commit()
-    conn.close()
+    put_db(conn)
     return jsonify({'status': 'ok'})
 
 
@@ -177,8 +220,21 @@ def get_events():
             ORDER BY date
         ''')
         rows = cur.fetchall()
-    conn.close()
-    return jsonify([clean_row(r) for r in rows])
+        cur.execute('''
+            SELECT event_id, COALESCE(SUM(days * qty * unit_price), 0) AS subtotal
+            FROM event_products GROUP BY event_id
+        ''')
+        sub_rows = cur.fetchall()
+    put_db(conn)
+    subtotals = {r['event_id']: float(r['subtotal']) for r in sub_rows}
+    out = []
+    for r in rows:
+        d = clean_row(r)
+        d['totals'] = totals_from_subtotal(
+            subtotals.get(d['id'], 0), bool(d.get('tax_inclusive')),
+            d.get('tax_type') or 'no_tax', d.get('discount_amount') or 0)
+        out.append(d)
+    return jsonify(out)
 
 
 @app.route('/api/events/<int:event_id>', methods=['GET'])
@@ -192,14 +248,14 @@ def get_event(event_id):
         ''', (event_id,))
         row = cur.fetchone()
         if not row:
-            conn.close()
+            put_db(conn)
             return jsonify({'error': 'not found'}), 404
         cur.execute(
             'SELECT * FROM event_products WHERE event_id=%s ORDER BY sort_order, id',
             (event_id,)
         )
         products = cur.fetchall()
-    conn.close()
+    put_db(conn)
 
     data = clean_row(row)
     data['products'] = [clean_row(p) for p in products]
@@ -239,7 +295,7 @@ def create_event():
         cur.execute('SELECT * FROM clients WHERE id=%s', (client_id,))
         client = cur.fetchone()
         if not client:
-            conn.close()
+            put_db(conn)
             return jsonify({'error': 'client not found'}), 400
 
         code = (data.get('code') or '').strip() or gen_event_code()
@@ -258,7 +314,7 @@ def create_event():
         new_id = cur.fetchone()['id']
         _save_products(cur, new_id, data.get('products'))
     conn.commit()
-    conn.close()
+    put_db(conn)
     return jsonify({'id': new_id}), 201
 
 
@@ -277,7 +333,7 @@ def update_event(event_id):
         cur.execute('SELECT * FROM clients WHERE id=%s', (client_id,))
         client = cur.fetchone()
         if not client:
-            conn.close()
+            put_db(conn)
             return jsonify({'error': 'client not found'}), 400
 
         cur.execute(
@@ -292,7 +348,7 @@ def update_event(event_id):
         )
         _save_products(cur, event_id, data.get('products'))
     conn.commit()
-    conn.close()
+    put_db(conn)
     return jsonify({'status': 'ok'})
 
 
@@ -302,7 +358,7 @@ def delete_event(event_id):
     with conn.cursor() as cur:
         cur.execute('DELETE FROM events WHERE id=%s', (event_id,))
     conn.commit()
-    conn.close()
+    put_db(conn)
     return jsonify({'status': 'ok'})
 
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>J&amp;R TENTS</title>
+<title>J&amp;R TENTS BUSINESS SUITE</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -23,6 +23,7 @@
                 paint-order="stroke" stroke="#1d4ed8" stroke-width="13"
                 stroke-linejoin="round" fill="#f4f4f4">J&amp;R TENTS</text>
         </svg>
+        <div class="brand-suite">BUSINESS SUITE</div>
         <div class="brand-details">
           <div>Next to Doctors Hospital, Ebb Road, Kampala</div>
           <div class="brand-phone">&#128222; 0752 522 799</div>
@@ -63,6 +64,18 @@
   </aside>
 
   <main class="main">
+
+    <!-- Brand banner shown on phones only (the sidebar is hidden there) -->
+    <div class="mobile-brand">
+      <svg viewBox="0 0 400 74" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="J&amp;R TENTS">
+        <text x="200" y="52" text-anchor="middle"
+              font-family="'Arial Black', Arial, sans-serif" font-weight="900"
+              font-size="52" letter-spacing="1"
+              paint-order="stroke" stroke="#1d4ed8" stroke-width="13"
+              stroke-linejoin="round" fill="#f4f4f4">J&amp;R TENTS</text>
+      </svg>
+      <div class="brand-suite">BUSINESS SUITE</div>
+    </div>
 
     <!-- ================= DASHBOARD / CALENDAR VIEW ================= -->
     <section id="view-dashboard" class="view">
