@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J&amp;R TENTS</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app">
+
+  <button id="sidebar-toggle" class="sidebar-toggle" title="Open menu">&#9776;</button>
+  <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+
+  <aside class="sidebar">
+    <button id="sidebar-min" class="sidebar-min" title="Hide menu">&#10094;</button>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 400 74" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="J&amp;R TENTS">
+          <text x="200" y="52" text-anchor="middle"
+                font-family="'Arial Black', Arial, sans-serif" font-weight="900"
+                font-size="52" letter-spacing="1"
+                paint-order="stroke" stroke="#1d4ed8" stroke-width="13"
+                stroke-linejoin="round" fill="#f4f4f4">J&amp;R TENTS</text>
+        </svg>
+        <div class="brand-details">
+          <div>Next to Doctors Hospital, Ebb Road, Kampala</div>
+          <div class="brand-phone">&#128222; 0752 522 799</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active" data-view="dashboard">
+        <span class="nav-icon">&#128197;</span> Dashboard
+      </div>
+
+      <div class="nav-section">Sales</div>
+      <div class="nav-item" data-view="clients">
+        <span class="nav-icon">&#128100;</span> Clients
+      </div>
+      <div class="nav-item" data-view="dashboard">
+        <span class="nav-icon">&#127915;</span> Events
+      </div>
+      <div class="nav-item disabled" data-view="soon">
+        <span class="nav-icon">&#128179;</span> Payments
+      </div>
+
+      <div class="nav-section">Purchases</div>
+      <div class="nav-item disabled" data-view="soon">
+        <span class="nav-icon">&#128736;</span> Vendors
+      </div>
+      <div class="nav-item disabled" data-view="soon">
+        <span class="nav-icon">&#129534;</span> Expenses
+      </div>
+      <div class="nav-item disabled" data-view="soon">
+        <span class="nav-icon">&#128203;</span> Purchase Orders
+      </div>
+      <div class="nav-item disabled" data-view="soon">
+        <span class="nav-icon">&#128196;</span> Bills
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+
+    <!-- ================= DASHBOARD / CALENDAR VIEW ================= -->
+    <section id="view-dashboard" class="view">
+      <div class="topbar">
+        <h1 id="month-label">Month Year</h1>
+        <div class="topbar-controls">
+          <div class="toggle-group">
+            <button id="btn-month" class="toggle-btn active">month</button>
+            <button id="btn-list" class="toggle-btn">list</button>
+          </div>
+          <button id="btn-today" class="pill-btn">today</button>
+          <button id="btn-prev" class="nav-arrow">&#10094;</button>
+          <button id="btn-next" class="nav-arrow">&#10095;</button>
+          <button id="btn-add-event" class="add-btn">+ New Event</button>
+        </div>
+      </div>
+
+      <div id="calendar-month" class="calendar"></div>
+      <div id="calendar-list" class="event-list hidden"></div>
+    </section>
+
+    <!-- ================= CLIENTS VIEW ================= -->
+    <section id="view-clients" class="view hidden">
+      <div class="topbar">
+        <h1>Clients</h1>
+        <div class="topbar-controls">
+          <button id="btn-add-client" class="add-btn">+ New Client</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Address</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="clients-tbody"></tbody>
+        </table>
+        <div id="clients-empty" class="empty-state hidden">No clients yet. Click "+ New Client" to add one.</div>
+      </div>
+    </section>
+
+    <!-- ================= EVENT DETAIL (read-only view) ================= -->
+    <section id="view-event-detail" class="view hidden">
+      <div class="breadcrumb">
+        <button id="event-detail-back" class="crumb-back" title="Back">&#8592;</button>
+        <span class="crumb-home">&#127968;</span>
+        <span class="crumb-sep">&gt;</span>
+        <span>Events</span>
+        <span class="crumb-sep">&gt;</span>
+        <span id="event-detail-crumb" class="crumb-current"></span>
+      </div>
+
+      <div class="detail-info">
+        <div class="detail-info-row"><span class="detail-info-label">Category:</span><span id="ed-category">&mdash;</span></div>
+        <div class="detail-info-row"><span class="detail-info-label">Date:</span><span id="ed-date">&mdash;</span></div>
+        <div class="detail-info-row"><span class="detail-info-label">Location:</span><span id="ed-location">&mdash;</span></div>
+        <div class="detail-info-row"><span class="detail-info-label">Classification:</span><span id="ed-classification">&mdash;</span></div>
+      </div>
+
+      <h2 class="form-heading">Client Details</h2>
+      <div id="ed-client" class="detail-client"></div>
+
+      <h2 class="form-heading">Products</h2>
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Dimensions</th>
+              <th class="num">Days</th>
+              <th class="num">Qty</th>
+              <th class="num">Unit Cost</th>
+              <th class="num">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="ed-products-tbody"></tbody>
+          <tfoot id="ed-totals-tfoot"></tfoot>
+        </table>
+      </div>
+      <div id="ed-tax-note" class="detail-tax-note"></div>
+
+      <h2 class="form-heading">Notes</h2>
+      <div id="ed-notes" class="detail-notes"></div>
+
+      <div class="event-form-actions">
+        <button id="ed-invoice-btn" class="btn-invoice-pill">&#11015; Download Invoice</button>
+        <button id="ed-edit-btn" class="btn-create-pill">&#9998; Edit Event</button>
+      </div>
+    </section>
+
+    <!-- ================= NEW / EDIT EVENT (full page, like the reference) ================= -->
+    <section id="view-event-form" class="view hidden">
+      <div class="breadcrumb">
+        <button id="event-form-back" class="crumb-back" title="Back">&#8592;</button>
+        <span class="crumb-home">&#127968;</span>
+        <span class="crumb-sep">&gt;</span>
+        <span>Events</span>
+        <span class="crumb-sep">&gt;</span>
+        <span id="event-form-crumb" class="crumb-current">New Event</span>
+      </div>
+
+      <input type="hidden" id="ef-event-id">
+
+      <h2 class="form-heading">Details</h2>
+
+      <div class="field">
+        <label class="field-label">Client</label>
+        <div class="client-search">
+          <input type="text" id="ef-client-search" placeholder="Search clients&hellip;" autocomplete="off">
+          <span class="search-icon">&#128269;</span>
+          <div id="ef-client-suggestions" class="client-suggestions hidden"></div>
+        </div>
+        <input type="hidden" id="ef-client-id">
+        <div class="field-hint">The client must exist in the existing list of clients. <a href="#" id="ef-add-client-link">Click here</a> to add a new client.</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Classification</label>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="ef-classification" value="retail" checked> Retail</label>
+            <label class="radio-option"><input type="radio" name="ef-classification" value="vat"> VAT</label>
+          </div>
+          <div class="field-hint">Pick one classification for this event</div>
+        </div>
+        <div class="field">
+          <label class="field-label">Event Date</label>
+          <input type="date" id="ef-date">
+        </div>
+        <div class="field">
+          <label class="field-label">End Date</label>
+          <input type="date" id="ef-end-date">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Category</label>
+          <input type="text" id="ef-category" list="ef-category-list" placeholder="e.g. Wedding, Kwanjula, Birthday&hellip;" autocomplete="off">
+          <datalist id="ef-category-list"></datalist>
+        </div>
+        <div class="field">
+          <label class="field-label">Colour</label>
+          <select id="ef-color"></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Event Location</label>
+        <input type="text" id="ef-location" placeholder="">
+        <div class="field-hint">Format: Building name, street name, city</div>
+      </div>
+
+      <h2 class="form-heading">Products</h2>
+      <div id="ef-products-empty" class="field-hint">No products added yet. Add a product to continue.</div>
+
+      <div class="products-table-wrap">
+        <table class="products-table" id="ef-products-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Dimensions</th>
+              <th>Days</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th>Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ef-products-tbody"></tbody>
+        </table>
+      </div>
+      <button id="ef-add-product" class="pill-add-btn">&#10133; New Product</button>
+
+      <h2 class="form-heading">Price Details</h2>
+
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Tax Inclusive or Exclusive</label>
+          <label class="switch-row">
+            <span class="switch">
+              <input type="checkbox" id="ef-tax-inclusive">
+              <span class="switch-slider"></span>
+            </span>
+            <span id="ef-tax-inclusive-label">Prices are tax exclusive</span>
+          </label>
+        </div>
+        <div class="field">
+          <label class="field-label">Tax</label>
+          <select id="ef-tax-type">
+            <option value="no_tax">No Tax</option>
+            <option value="vat18">VAT (18%)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Discount</label>
+          <div class="field-row" style="gap:8px;">
+            <input type="number" id="ef-discount" value="0" min="0" step="any" style="flex:1;">
+            <select id="ef-discount-currency" style="width:100px;">
+              <option>UGX</option>
+              <option>USD</option>
+              <option>KES</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-row"><span>Subtotal</span><span id="ef-sum-subtotal">0</span></div>
+        <div class="summary-row"><span>Discount</span><span id="ef-sum-discount">0</span></div>
+        <div class="summary-row"><span>Tax</span><span id="ef-sum-tax">0</span></div>
+        <div class="summary-row summary-total"><span>Total</span><span id="ef-sum-total">0</span></div>
+      </div>
+
+      <div class="event-form-actions">
+        <button id="ef-cancel" class="btn-cancel-pill">&#10060; Cancel</button>
+        <button id="ef-save" class="btn-create-pill">&#128077; <span id="ef-save-label">Create Event</span></button>
+      </div>
+      <button id="ef-delete" class="btn-danger hidden" style="margin-top:10px;">Delete this event</button>
+    </section>
+
+    <!-- ================= COMING SOON VIEW ================= -->
+    <section id="view-soon" class="view hidden">
+      <div class="topbar"><h1>Coming soon</h1></div>
+      <p class="soon-text">This section isn't built yet in this first version. Ask Claude to add it whenever you're ready.</p>
+    </section>
+
+  </main>
+</div>
+
+<!-- ================= EVENT QUICK-VIEW POPUP ================= -->
+<div id="event-popup" class="modal-backdrop hidden">
+  <div class="modal event-popup">
+    <div class="popup-color-bar" id="ep-color-bar"></div>
+    <h2 id="ep-client">Client</h2>
+    <div class="popup-rows">
+      <div class="popup-row"><span class="popup-label">Date</span><span id="ep-date"></span></div>
+      <div class="popup-row"><span class="popup-label">Location</span><span id="ep-location"></span></div>
+      <div class="popup-row"><span class="popup-label">Total</span><span id="ep-total" class="popup-total"></span></div>
+    </div>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="ep-close" class="btn-secondary">Close</button>
+      <button id="ep-more" class="btn-primary">More &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CLIENT MODAL (quick add, used from event form too) ================= -->
+<div id="client-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2 id="client-modal-title">New Client</h2>
+    <input type="hidden" id="client-id">
+
+    <label>Name</label>
+    <input type="text" id="client-name" placeholder="Full name">
+
+    <label>Phone</label>
+    <input type="text" id="client-phone" placeholder="+256 ...">
+
+    <label>Email</label>
+    <input type="email" id="client-email" placeholder="name@example.com">
+
+    <label>Address</label>
+    <input type="text" id="client-address">
+
+    <label>Notes</label>
+    <textarea id="client-notes" rows="3"></textarea>
+
+    <div class="modal-actions">
+      <button id="client-delete" class="btn-danger hidden">Delete</button>
+      <div class="spacer"></div>
+      <button id="client-cancel" class="btn-secondary">Cancel</button>
+      <button id="client-save" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="{{ url_for('static', filename='invoice-pdf.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

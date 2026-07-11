@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29917413/README.md)
 # J&R TENTS
 
 A small events/decor business management app: a color-coded calendar of bookings
