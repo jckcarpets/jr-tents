@@ -999,9 +999,11 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .breadcrumb { margin: -12px -5px 18px -5px; padding: 12px 14px; font-size: 12.5px; }
   .form-heading { font-size: 16px; margin: 20px 0 10px 0; }
 
-  .detail-info { max-width: 100%; gap: 5px; }
-  .detail-info-row { font-size: 12px; gap: 12px; }
-  .detail-info-row span:last-child { word-break: break-word; }
+  /* Details on phones: labels start at the halfway point of the screen,
+     values finish flush at the right edge */
+  .detail-info { max-width: none; width: 50%; gap: 5px; margin-left: auto; }
+  .detail-info-row { font-size: 12px; gap: 8px; justify-content: space-between; }
+  .detail-info-row span:last-child { word-break: break-word; text-align: right; }
 
   .detail-client { font-size: 14px; }
 
@@ -1010,6 +1012,8 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .detail-table td { font-size: 10.5px; padding: 7px 5px; }
   .detail-table td.num, .detail-table .totals-value { white-space: nowrap; }
   .detail-table tfoot td { padding: 5px 5px; }
+  /* Amount Due row matches the size of the other figures on phones */
+  .detail-table tfoot tr.grand td { font-size: 10.5px; }
 
   .detail-tax-note { font-size: 11.5px; }
   .detail-notes { font-size: 12.5px; }

@@ -433,7 +433,7 @@ function openEventDetail(ev) {
     <tr class="grand">
       <td colspan="4"></td>
       <td class="totals-label">Amount Due</td>
-      <td class="totals-value">${formatMoney(t.total)} ${currency}</td>
+      <td class="totals-value">${formatMoney(t.total)}</td>
     </tr>
   `;
 
