@@ -39,8 +39,18 @@
   function PdfDoc() {
     this.pages = [];      // each: array of content-stream ops
     this.current = null;
+    this.logo = null;     // {bytes: Uint8Array (JPEG), w, h} — optional
     this.newPage();
   }
+
+  // Draw the registered logo image with its top-left corner at (x, yTop)
+  PdfDoc.prototype.drawLogo = function (x, yTop, wPt, hPt) {
+    const py = PAGE_H - yTop - hPt;
+    this.current.push(
+      'q ' + wPt.toFixed(2) + ' 0 0 ' + hPt.toFixed(2) + ' ' +
+      x.toFixed(2) + ' ' + py.toFixed(2) + ' cm /Im1 Do Q'
+    );
+  };
 
   PdfDoc.prototype.newPage = function () {
     this.current = [];
@@ -80,60 +90,134 @@
 
   PdfDoc.prototype.build = function () {
     const enc = new TextEncoder();
-    const objects = [];   // 1-based object bodies (without "N 0 obj")
-
+    const hasLogo = !!this.logo;
     const pageCount = this.pages.length;
-    // Object layout: 1 Catalog, 2 Pages, 3 F1, 4 F2,
-    // then per page i: (5 + i*2) Page, (6 + i*2) Contents
+
+    // Object layout: 1 Catalog, 2 Pages, 3 F1, 4 F2, [5 Im1],
+    // then per page i: Page, Contents
+    const firstPageObj = hasLogo ? 6 : 5;
+    const objects = [];   // each entry: string OR {head, bytes, tail}
+
     objects.push('<< /Type /Catalog /Pages 2 0 R >>');
     const kids = [];
-    for (let i = 0; i < pageCount; i++) kids.push((5 + i * 2) + ' 0 R');
+    for (let i = 0; i < pageCount; i++) kids.push((firstPageObj + i * 2) + ' 0 R');
     objects.push('<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + pageCount + ' >>');
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
 
+    if (hasLogo) {
+      objects.push({
+        head: '<< /Type /XObject /Subtype /Image /Width ' + this.logo.w +
+              ' /Height ' + this.logo.h +
+              ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
+              this.logo.bytes.length + ' >>\nstream\n',
+        bytes: this.logo.bytes,
+        tail: '\nendstream',
+      });
+    }
+
+    const resources = '/Resources << /Font << /F1 3 0 R /F2 4 0 R >>' +
+      (hasLogo ? ' /XObject << /Im1 5 0 R >>' : '') + ' >>';
+
     this.pages.forEach((ops, i) => {
-      const contentRef = (6 + i * 2);
+      const contentRef = (firstPageObj + i * 2 + 1);
       objects.push(
         '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PAGE_W + ' ' + PAGE_H + '] ' +
-        '/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + contentRef + ' 0 R >>'
+        resources + ' /Contents ' + contentRef + ' 0 R >>'
       );
       const stream = ops.join('\n');
       const streamBytes = enc.encode(stream);
       objects.push('<< /Length ' + streamBytes.length + ' >>\nstream\n' + stream + '\nendstream');
     });
 
-    let pdf = '%PDF-1.4\n%âãÏÓ\n';
+    // Assemble with byte-accurate offsets (streams may be binary)
+    const parts = [];
+    let offset = 0;
+    function push(x) {
+      const b = typeof x === 'string' ? enc.encode(x) : x;
+      parts.push(b);
+      offset += b.length;
+    }
+
+    push('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
     const offsets = [0];
     objects.forEach((body, idx) => {
-      offsets.push(enc.encode(pdf).length);
-      pdf += (idx + 1) + ' 0 obj\n' + body + '\nendobj\n';
+      offsets.push(offset);
+      push((idx + 1) + ' 0 obj\n');
+      if (typeof body === 'string') {
+        push(body);
+      } else {
+        push(body.head);
+        push(body.bytes);
+        push(body.tail);
+      }
+      push('\nendobj\n');
     });
-    const xrefPos = enc.encode(pdf).length;
-    pdf += 'xref\n0 ' + (objects.length + 1) + '\n';
-    pdf += '0000000000 65535 f \n';
+    const xrefPos = offset;
+    let xref = 'xref\n0 ' + (objects.length + 1) + '\n0000000000 65535 f \n';
     for (let i = 1; i <= objects.length; i++) {
-      pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+      xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
     }
-    pdf += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefPos + '\n%%EOF';
-    return enc.encode(pdf);
+    push(xref + 'trailer\n<< /Size ' + (objects.length + 1) +
+         ' /Root 1 0 R >>\nstartxref\n' + xrefPos + '\n%%EOF');
+
+    const total = new Uint8Array(offset);
+    let pos = 0;
+    parts.forEach(p => { total.set(p, pos); pos += p.length; });
+    return total;
   };
+
+  // Load static/logo.png (if present) and convert to JPEG bytes for the PDF
+  async function loadLogo() {
+    try {
+      const resp = await fetch('static/logo.png', { cache: 'no-store' });
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      const bmp = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bmp.width;
+      canvas.height = bmp.height;
+      const cx = canvas.getContext('2d');
+      cx.fillStyle = '#ffffff';
+      cx.fillRect(0, 0, canvas.width, canvas.height);
+      cx.drawImage(bmp, 0, 0);
+      const b64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return { bytes: bytes, w: bmp.width, h: bmp.height };
+    } catch (e) {
+      return null;
+    }
+  }
 
   // ---------------- Invoice layout ----------------
 
-  window.downloadInvoicePDF = function (ev, formatMoney, formatDateRange) {
+  window.downloadInvoicePDF = async function (ev, formatMoney, formatDateRange) {
     const currency = ev.discount_currency || 'UGX';
     const t = ev.totals || { subtotal: 0, tax_amount: 0, discount_amount: 0, total: 0 };
     const products = ev.products || [];
     const code = ev.code || String(ev.id);
 
     const doc = new PdfDoc();
+    doc.logo = await loadLogo();
     let y = 58;
 
-    // Header — business identity (left) and invoice meta (right)
-    doc.text(MARGIN, y, 'J&R TENTS', 26, { bold: true, color: BLUE });
-    doc.text(MARGIN, y + 16, 'Next to Doctors Hospital, Ebb Road, Kampala', 9.5, { color: GRAY });
-    doc.text(MARGIN, y + 29, 'Tel: 0752 522 799', 9.5, { color: GRAY });
+    // Header — logo image top-left (exact artwork from static/logo.png);
+    // falls back to styled text if the file is missing.
+    let leftBottom;
+    if (doc.logo) {
+      const logoW = 185;
+      const logoH = logoW * (doc.logo.h / doc.logo.w);
+      doc.drawLogo(MARGIN, 42, logoW, logoH);
+      doc.text(MARGIN, 42 + logoH + 14, 'Next to Doctors Hospital, Ebb Road, Kampala', 9.5, { color: GRAY });
+      leftBottom = 42 + logoH + 18;
+    } else {
+      doc.text(MARGIN, y, 'J&R TENTS', 26, { bold: true, color: BLUE });
+      doc.text(MARGIN, y + 16, 'Next to Doctors Hospital, Ebb Road, Kampala', 9.5, { color: GRAY });
+      doc.text(MARGIN, y + 29, 'Tel: 0752 522 799', 9.5, { color: GRAY });
+      leftBottom = y + 45;
+    }
 
     const R = PAGE_W - MARGIN;
     // Date the quotation is generated (today)
@@ -152,7 +236,7 @@
     }
     doc.text(R, metaY, 'Classification: ' + (ev.classification || 'retail').toUpperCase(), 9.5, { color: GRAY, align: 'right' });
 
-    y = Math.max(y + 45, metaY) + 14;
+    y = Math.max(leftBottom, metaY) + 14;
     doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, 2.2, BLUE);
     y += 24;
 
@@ -189,21 +273,44 @@
 
     tableHeader();
 
+    // Wrap text to fit a column width so long values never cross into the
+    // neighbouring columns — they stack on extra lines instead.
+    function wrapText(str, size, maxW) {
+      const words = String(str || '').split(/\s+/).filter(Boolean);
+      const lines = [];
+      let cur = '';
+      words.forEach(w => {
+        const cand = cur ? cur + ' ' + w : w;
+        if (!cur || textWidth(cand, size, false) <= maxW) cur = cand;
+        else { lines.push(cur); cur = w; }
+      });
+      if (cur) lines.push(cur);
+      return lines.length ? lines : [''];
+    }
+
+    const titleMaxW = cols.dims - cols.product - 12;
+    const dimsMaxW = 84;
+
     products.forEach(p => {
-      if (y > PAGE_H - 150) {   // room for at least totals footer
+      const titleLines = wrapText(p.title || '', 9.5, titleMaxW);
+      const dimLines = wrapText(p.dimensions || 'n/a', 9.5, dimsMaxW);
+      const nLines = Math.max(titleLines.length, dimLines.length);
+      const rowH = 9 + nLines * 12;
+
+      if (y + rowH > PAGE_H - 150) {   // room for at least totals footer
         doc.newPage();
         y = 50;
         tableHeader();
       }
       const amount = (Number(p.days) || 0) * (Number(p.qty) || 0) * (Number(p.unit_price) || 0);
       const ry = y + 15;
-      doc.text(cols.product, ry, p.title || '', 9.5);
-      doc.text(cols.dims, ry, p.dimensions || 'n/a', 9.5, { color: GRAY });
+      titleLines.forEach((ln, i) => doc.text(cols.product, ry + i * 12, ln, 9.5));
+      dimLines.forEach((ln, i) => doc.text(cols.dims, ry + i * 12, ln, 9.5, { color: GRAY }));
       doc.text(cols.days, ry, String(p.days), 9.5, { align: 'right' });
       doc.text(cols.qty, ry, String(p.qty), 9.5, { align: 'right' });
       doc.text(cols.unit, ry, formatMoney(Number(p.unit_price) || 0), 9.5, { align: 'right' });
       doc.text(cols.amount, ry, formatMoney(amount), 9.5, { align: 'right' });
-      y += 21;
+      y += rowH;
       doc.line(MARGIN, y, R, 0.5, LIGHT_LINE);
     });
 

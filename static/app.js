@@ -455,12 +455,9 @@ document.getElementById('ed-edit-btn').addEventListener('click', () => {
 
 document.getElementById('ed-invoice-btn').addEventListener('click', () => {
   if (!detailEvent) return;
-  try {
-    window.downloadInvoicePDF(detailEvent, formatMoney, formatDateRange);
-    toast('Quotation downloaded');
-  } catch (e) {
-    toast('Could not generate quotation: ' + e.message);
-  }
+  window.downloadInvoicePDF(detailEvent, formatMoney, formatDateRange)
+    .then(() => toast('Quotation downloaded'))
+    .catch(e => toast('Could not generate quotation: ' + e.message));
 });
 
 // ---------------- Calendar controls ----------------
