@@ -136,10 +136,16 @@
     doc.text(MARGIN, y + 29, 'Tel: 0752 522 799', 9.5, { color: GRAY });
 
     const R = PAGE_W - MARGIN;
-    doc.text(R, y, 'INVOICE', 24, { bold: true, color: BLUE, align: 'right' });
-    doc.text(R, y + 16, 'Invoice #: ' + code, 9.5, { color: GRAY, align: 'right' });
-    doc.text(R, y + 29, 'Event date: ' + formatDateRange(ev), 9.5, { color: GRAY, align: 'right' });
-    let metaY = y + 42;
+    // Date the quotation is generated (today)
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    doc.text(R, y, 'QUOTATION', 24, { bold: true, color: BLUE, align: 'right' });
+    doc.text(R, y + 16, 'Quotation #: ' + code, 9.5, { color: GRAY, align: 'right' });
+    doc.text(R, y + 29, 'Date: ' + todayStr, 9.5, { color: GRAY, align: 'right' });
+    doc.text(R, y + 42, 'Event date: ' + formatDateRange(ev), 9.5, { color: GRAY, align: 'right' });
+    let metaY = y + 55;
     if (ev.category) {
       doc.text(R, metaY, 'Category: ' + ev.category, 9.5, { color: GRAY, align: 'right' });
       metaY += 13;
@@ -228,17 +234,29 @@
 
     // Footer
     y += 34;
-    if (y > PAGE_H - 60) { doc.newPage(); y = 50; }
+    if (y > PAGE_H - 140) { doc.newPage(); y = 50; }
     doc.text(MARGIN, y, ev.tax_inclusive ? 'Prices are tax inclusive' : 'Prices are tax exclusive', 8.5, { color: GRAY });
     y += 20;
     doc.text(MARGIN, y, 'Thank you for your business!', 10, { bold: true, color: BLUE });
+
+    // Payment terms & bank details
+    y += 26;
+    doc.text(MARGIN, y, 'Payment Terms: CASH ON DELIVERY', 9.5, { bold: true });
+    y += 24;
+    doc.text(MARGIN, y, 'BANK DETAILS', 8.5, { bold: true, color: BLUE });
+    y += 14;
+    doc.text(MARGIN, y, 'Centenary Bank', 9.5);
+    y += 13;
+    doc.text(MARGIN, y, 'A/C No. 3201497074', 9.5);
+    y += 13;
+    doc.text(MARGIN, y, 'NASSIMBWA JOYCE', 9.5);
 
     // Direct download
     const bytes = doc.build();
     const blob = new Blob([bytes], { type: 'application/pdf' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'Invoice-' + code + '.pdf';
+    a.download = 'Quotation-' + code + '.pdf';
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {

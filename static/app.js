@@ -457,9 +457,9 @@ document.getElementById('ed-invoice-btn').addEventListener('click', () => {
   if (!detailEvent) return;
   try {
     window.downloadInvoicePDF(detailEvent, formatMoney, formatDateRange);
-    toast('Invoice downloaded');
+    toast('Quotation downloaded');
   } catch (e) {
-    toast('Could not generate invoice: ' + e.message);
+    toast('Could not generate quotation: ' + e.message);
   }
 });
 
