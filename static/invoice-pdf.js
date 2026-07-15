@@ -14,6 +14,14 @@
   const GRAY = [0.42, 0.45, 0.5];
   const LIGHT_LINE = [0.85, 0.88, 0.95];
 
+  const ADDRESS_LINES = [
+    'P.O Box 119600',
+    'Kampala, Uganda',
+    "Seguku, Next to Doctor's Hospital",
+    'Email: jroutdoorsug@gmail.com',
+    'Website: www.jroutdoorsug.com',
+  ];
+
   // Accurate-enough text measurement via canvas (browser Helvetica/Arial
   // metrics match PDF base-14 Helvetica very closely).
   const _canvas = document.createElement('canvas');
@@ -39,16 +47,22 @@
   function PdfDoc() {
     this.pages = [];      // each: array of content-stream ops
     this.current = null;
-    this.logo = null;     // {bytes: Uint8Array (JPEG), w, h} — optional
+    this.images = [];     // array of {bytes: Uint8Array (JPEG), w, h}
     this.newPage();
   }
 
-  // Draw the registered logo image with its top-left corner at (x, yTop)
-  PdfDoc.prototype.drawLogo = function (x, yTop, wPt, hPt) {
+  // Register an image; returns its 1-based index (used as /Im<index>)
+  PdfDoc.prototype.addImage = function (img) {
+    this.images.push(img);
+    return this.images.length;
+  };
+
+  // Draw image #idx with its top-left corner at (x, yTop)
+  PdfDoc.prototype.drawImage = function (idx, x, yTop, wPt, hPt) {
     const py = PAGE_H - yTop - hPt;
     this.current.push(
       'q ' + wPt.toFixed(2) + ' 0 0 ' + hPt.toFixed(2) + ' ' +
-      x.toFixed(2) + ' ' + py.toFixed(2) + ' cm /Im1 Do Q'
+      x.toFixed(2) + ' ' + py.toFixed(2) + ' cm /Im' + idx + ' Do Q'
     );
   };
 
@@ -90,12 +104,13 @@
 
   PdfDoc.prototype.build = function () {
     const enc = new TextEncoder();
-    const hasLogo = !!this.logo;
+    const nImg = this.images.length;
     const pageCount = this.pages.length;
 
-    // Object layout: 1 Catalog, 2 Pages, 3 F1, 4 F2, [5 Im1],
+    // Object layout: 1 Catalog, 2 Pages, 3 F1, 4 F2, [images 5..(4+nImg)],
     // then per page i: Page, Contents
-    const firstPageObj = hasLogo ? 6 : 5;
+    const firstImgObj = 5;
+    const firstPageObj = firstImgObj + nImg;
     const objects = [];   // each entry: string OR {head, bytes, tail}
 
     objects.push('<< /Type /Catalog /Pages 2 0 R >>');
@@ -105,19 +120,23 @@
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
 
-    if (hasLogo) {
+    this.images.forEach(img => {
       objects.push({
-        head: '<< /Type /XObject /Subtype /Image /Width ' + this.logo.w +
-              ' /Height ' + this.logo.h +
+        head: '<< /Type /XObject /Subtype /Image /Width ' + img.w +
+              ' /Height ' + img.h +
               ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
-              this.logo.bytes.length + ' >>\nstream\n',
-        bytes: this.logo.bytes,
+              img.bytes.length + ' >>\nstream\n',
+        bytes: img.bytes,
         tail: '\nendstream',
       });
-    }
+    });
 
+    let xobjects = '';
+    for (let i = 0; i < nImg; i++) {
+      xobjects += ' /Im' + (i + 1) + ' ' + (firstImgObj + i) + ' 0 R';
+    }
     const resources = '/Resources << /Font << /F1 3 0 R /F2 4 0 R >>' +
-      (hasLogo ? ' /XObject << /Im1 5 0 R >>' : '') + ' >>';
+      (nImg ? ' /XObject <<' + xobjects + ' >>' : '') + ' >>';
 
     this.pages.forEach((ops, i) => {
       const contentRef = (firstPageObj + i * 2 + 1);
@@ -167,10 +186,11 @@
     return total;
   };
 
-  // Load static/logo.png (if present) and convert to JPEG bytes for the PDF
-  async function loadLogo() {
+  // Load an image file (PNG/JPG) and convert to JPEG bytes for the PDF.
+  // Returns { bytes, w, h } or null if the file is missing.
+  async function loadImage(path) {
     try {
-      const resp = await fetch('static/logo.png', { cache: 'no-store' });
+      const resp = await fetch(path, { cache: 'no-store' });
       if (!resp.ok) return null;
       const blob = await resp.blob();
       const bmp = await createImageBitmap(blob);
@@ -200,23 +220,36 @@
     const code = ev.code || String(ev.id);
 
     const doc = new PdfDoc();
-    doc.logo = await loadLogo();
+    const logoImg = await loadImage('static/logo.png');
+    const iconTiktok = await loadImage('static/icon-tiktok.png');
+    const iconInstagram = await loadImage('static/icon-instagram.png');
+    const iconGlobe = await loadImage('static/icon-globe.png');
+    const logoIdx = logoImg ? doc.addImage(logoImg) : 0;
     let y = 58;
 
     // Header — logo image top-left (exact artwork from static/logo.png);
     // falls back to styled text if the file is missing.
     let leftBottom;
-    if (doc.logo) {
-      const logoW = 185;
-      const logoH = logoW * (doc.logo.h / doc.logo.w);
-      doc.drawLogo(MARGIN, 42, logoW, logoH);
-      doc.text(MARGIN, 42 + logoH + 14, 'Next to Doctors Hospital, Ebb Road, Kampala', 9.5, { color: GRAY });
-      leftBottom = 42 + logoH + 18;
+    if (logoImg) {
+      const logoW = 160;
+      const logoH = logoW * (logoImg.h / logoImg.w);
+      doc.drawImage(logoIdx, MARGIN, 42, logoW, logoH);
+      // Address block sits BESIDE the logo, to its right
+      const addrX = MARGIN + logoW + 18;
+      let ly = 48;
+      ADDRESS_LINES.forEach(line => {
+        doc.text(addrX, ly, line, 9, { color: GRAY });
+        ly += 12;
+      });
+      leftBottom = Math.max(42 + logoH, ly - 6);
     } else {
       doc.text(MARGIN, y, 'J&R TENTS', 26, { bold: true, color: BLUE });
-      doc.text(MARGIN, y + 16, 'Next to Doctors Hospital, Ebb Road, Kampala', 9.5, { color: GRAY });
-      doc.text(MARGIN, y + 29, 'Tel: 0752 522 799', 9.5, { color: GRAY });
-      leftBottom = y + 45;
+      let ly = y + 16;
+      ADDRESS_LINES.forEach(line => {
+        doc.text(MARGIN, ly, line, 9, { color: GRAY });
+        ly += 12;
+      });
+      leftBottom = ly - 6;
     }
 
     const R = PAGE_W - MARGIN;
@@ -225,16 +258,31 @@
     const todayStr = now.getFullYear() + '-' +
       String(now.getMonth() + 1).padStart(2, '0') + '-' +
       String(now.getDate()).padStart(2, '0');
-    doc.text(R, y, 'QUOTATION', 24, { bold: true, color: BLUE, align: 'right' });
-    doc.text(R, y + 16, 'Quotation #: ' + code, 9.5, { color: GRAY, align: 'right' });
-    doc.text(R, y + 29, 'Date: ' + todayStr, 9.5, { color: GRAY, align: 'right' });
-    doc.text(R, y + 42, 'Event date: ' + formatDateRange(ev), 9.5, { color: GRAY, align: 'right' });
-    let metaY = y + 55;
-    if (ev.category) {
-      doc.text(R, metaY, 'Category: ' + ev.category, 9.5, { color: GRAY, align: 'right' });
+    // Shift the quotation details down so the block sits level with the
+    // lower part of the address block, rather than starting at the very top.
+    const metaTop = y + 50;
+    doc.text(R, metaTop, 'QUOTATION', 12, { bold: true, color: BLUE, align: 'right' });
+
+    // Two-column meta: labels right-aligned to a divider, values left-aligned
+    // after it so all values line up in a neat column.
+    const metaPairs = [
+      ['Quotation #:', code],
+      ['Date:', todayStr],
+      ['Event date:', formatDateRange(ev)],
+    ];
+    if (ev.category) metaPairs.push(['Category:', ev.category]);
+    metaPairs.push(['Classification:', (ev.classification || 'retail').toUpperCase()]);
+
+    // Value column left edge: leave room for the widest value up to R.
+    let widestVal = 0;
+    metaPairs.forEach(([, v]) => { widestVal = Math.max(widestVal, textWidth(String(v), 9.5, false)); });
+    const valueX = R - widestVal;
+    let metaY = metaTop + 16;
+    metaPairs.forEach(([label, value]) => {
+      doc.text(valueX - 6, metaY, label, 9.5, { color: GRAY, align: 'right' });
+      doc.text(valueX, metaY, String(value), 9.5, { color: GRAY });
       metaY += 13;
-    }
-    doc.text(R, metaY, 'Classification: ' + (ev.classification || 'retail').toUpperCase(), 9.5, { color: GRAY, align: 'right' });
+    });
 
     y = Math.max(leftBottom, metaY) + 14;
     doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, 2.2, BLUE);
@@ -337,18 +385,19 @@
     doc.line(labelX - 5, y - 10, R, 1.4, BLUE);
     y += 8;
     doc.text(labelX - 45, y, 'Amount Due', 12, { bold: true, color: BLUE });
-    doc.text(cols.amount, y, formatMoney(t.total) + ' ' + currency, 12, { bold: true, color: BLUE, align: 'right' });
+    doc.text(cols.amount, y, formatMoney(t.total), 12, { bold: true, color: BLUE, align: 'right' });
 
     // Footer
     y += 34;
-    if (y > PAGE_H - 140) { doc.newPage(); y = 50; }
+    if (y > PAGE_H - 230) { doc.newPage(); y = 50; }
     doc.text(MARGIN, y, ev.tax_inclusive ? 'Prices are tax inclusive' : 'Prices are tax exclusive', 8.5, { color: GRAY });
     y += 20;
     doc.text(MARGIN, y, 'Thank you for your business!', 10, { bold: true, color: BLUE });
 
     // Payment terms & bank details
     y += 26;
-    doc.text(MARGIN, y, 'Payment Terms: CASH ON DELIVERY', 9.5, { bold: true });
+    doc.text(MARGIN, y, 'Payment Terms: 100% Cash before delivery', 9.5, { bold: true });
+    doc.text(PAGE_W - MARGIN, y, 'Kind Note: Please make a deposit to secure your booking', 9.5, { bold: true, align: 'right' });
     y += 24;
     doc.text(MARGIN, y, 'BANK DETAILS', 8.5, { bold: true, color: BLUE });
     y += 14;
@@ -357,6 +406,25 @@
     doc.text(MARGIN, y, 'A/C No. 3201497074', 9.5);
     y += 13;
     doc.text(MARGIN, y, 'NASSIMBWA JOYCE', 9.5);
+
+    // Social handles with icons — all on one line, below the bank details
+    y += 26;
+    const iconSize = 13;
+    const socials = [
+      [iconTiktok, 'jrtentsuganda'],
+      [iconInstagram, 'jr.tents'],
+      [iconGlobe, 'www.jroutdoorsug.com'],
+    ];
+    let sx = MARGIN;
+    socials.forEach(([icon, handle], i) => {
+      if (icon) {
+        const idx = doc.addImage(icon);
+        doc.drawImage(idx, sx, y - 10, iconSize, iconSize);
+      }
+      const tx = sx + iconSize + 6;
+      doc.text(tx, y, handle, 9.5);
+      sx = tx + textWidth(handle, 9.5, false) + 22; // gap before next item
+    });
 
     // Direct download
     const bytes = doc.build();
