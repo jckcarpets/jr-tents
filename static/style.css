@@ -920,15 +920,15 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   display: flex;
   flex-direction: column;
   gap: 7px;
-  max-width: 420px;
+  align-items: flex-end;   /* right-align the whole details group */
   margin-left: auto;
   margin-bottom: 6px;
 }
 
 .detail-info-row {
   display: flex;
-  justify-content: space-between;
-  gap: 24px;
+  justify-content: flex-end;
+  gap: 12px;
   font-size: 14.5px;
 }
 
@@ -1150,11 +1150,10 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .breadcrumb { margin: -12px -5px 18px -5px; padding: 12px 14px; font-size: 12.5px; }
   .form-heading { font-size: 16px; margin: 20px 0 10px 0; }
 
-  /* Details on phones: use the full screen width so long values (location,
-     category) never run off the right edge. Label on the left, value on the
-     right, value wraps if needed. */
-  .detail-info { max-width: none; width: 100%; gap: 7px; margin-left: 0; margin-top: 4px; }
-  .detail-info-row { font-size: 13px; gap: 12px; justify-content: space-between; }
+  /* Details on phones: right-aligned group (label + value together on the
+     right). Values wrap if needed so nothing runs off the edge. */
+  .detail-info { max-width: 100%; width: auto; gap: 7px; margin-left: auto; margin-top: 4px; align-items: flex-end; }
+  .detail-info-row { font-size: 13px; gap: 10px; justify-content: flex-end; }
   .detail-info-label { flex-shrink: 0; }
   .detail-info-row span:last-child { word-break: break-word; text-align: right; min-width: 0; }
 
@@ -1251,12 +1250,10 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
     word-break: break-word;
     white-space: normal;
   }
-  .detail-table-payments th:nth-child(1), .detail-table-payments td:nth-child(1) { width: 19%; }
-  .detail-table-payments th:nth-child(2), .detail-table-payments td:nth-child(2) { width: 15%; }
-  .detail-table-payments th:nth-child(3), .detail-table-payments td:nth-child(3) { width: 20%; }
-  .detail-table-payments th:nth-child(4), .detail-table-payments td:nth-child(4) { width: 27%; }
-  .detail-table-payments th:nth-child(5), .detail-table-payments td:nth-child(5) { width: 19%; }
-  .pay-for-cell { font-size: 9px; max-width: none; }
+  .detail-table-payments th:nth-child(1), .detail-table-payments td:nth-child(1) { width: 28%; }
+  .detail-table-payments th:nth-child(2), .detail-table-payments td:nth-child(2) { width: 24%; }
+  .detail-table-payments th:nth-child(3), .detail-table-payments td:nth-child(3) { width: 26%; }
+  .detail-table-payments th:nth-child(4), .detail-table-payments td:nth-child(4) { width: 22%; }
 
   /* Payment detail landing page on phones */
   .pd-code { font-size: 20px; }

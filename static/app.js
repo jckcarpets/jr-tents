@@ -473,16 +473,12 @@ function renderDetailPayments(ev) {
   tbody.innerHTML = '';
   document.getElementById('ed-payments-empty').classList.toggle('hidden', payments.length > 0);
   payments.forEach(p => {
-    const forText = (p.items && p.items.length)
-      ? p.items.map(it => `${it.product_title || '—'} (${formatMoney(Number(it.amount) || 0)})`).join(', ')
-      : '—';
     const tr = document.createElement('tr');
     tr.className = 'pay-row-clickable';
     tr.innerHTML = `
       <td>${escapeHtml(p.date || '')}</td>
       <td>${escapeHtml(p.method || '')}</td>
       <td>${escapeHtml(p.paid_by || '')}</td>
-      <td class="pay-for-cell">${escapeHtml(forText)}</td>
       <td class="num">${formatMoney(Number(p.amount) || 0)}</td>
     `;
     tr.addEventListener('click', () => openPaymentDetail(p));
