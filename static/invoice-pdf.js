@@ -477,11 +477,17 @@
     return out;
   }
 
+  // Same reference the receipt PDF prints, so the app can show it too.
+  window.receiptRefFor = function (ev, payment) {
+    const eventRef = ev.code || String(ev.id);
+    return genReceiptRef(eventRef + ':' + (payment.id != null ? payment.id : (payment.date || '')));
+  };
+
   window.downloadPaymentReceiptPDF = async function (ev, payment, formatMoney) {
     const currency = ev.discount_currency || 'UGX';
     const products = ev.products || [];
     const eventRef = ev.code || String(ev.id);
-    const ref = genReceiptRef(eventRef + ':' + (payment.id != null ? payment.id : (payment.date || '')));
+    const ref = window.receiptRefFor(ev, payment);
 
     // Amount paid in THIS receipt, per product title
     const paidThis = {};

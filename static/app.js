@@ -477,37 +477,113 @@ function renderDetailPayments(ev) {
       ? p.items.map(it => `${it.product_title || '—'} (${formatMoney(Number(it.amount) || 0)})`).join(', ')
       : '—';
     const tr = document.createElement('tr');
+    tr.className = 'pay-row-clickable';
     tr.innerHTML = `
       <td>${escapeHtml(p.date || '')}</td>
       <td>${escapeHtml(p.method || '')}</td>
       <td>${escapeHtml(p.paid_by || '')}</td>
       <td class="pay-for-cell">${escapeHtml(forText)}</td>
       <td class="num">${formatMoney(Number(p.amount) || 0)}</td>
-      <td class="num pay-actions">
-        <button class="pay-receipt-btn" title="Download receipt">&#128229;<span class="pay-receipt-label"> Receipt</span></button>
-        <button class="pay-del-btn" title="Delete">&times;</button>
-      </td>
     `;
-    tr.querySelector('.pay-receipt-btn').addEventListener('click', () => {
-      try {
-        window.downloadPaymentReceiptPDF(ev, p, formatMoney);
-      } catch (e) { toast('Could not build receipt: ' + e.message); }
-    });
-    tr.querySelector('.pay-del-btn').addEventListener('click', async () => {
-      try {
-        await api(`/api/payments/${p.id}`, { method: 'DELETE' });
-        toast('Payment removed');
-        const fresh = await api(`/api/events/${ev.id}`);
-        detailEvent = fresh;
-        renderDetailPayments(fresh);
-        await loadAll();
-      } catch (e) { toast(e.message); }
-    });
+    tr.addEventListener('click', () => openPaymentDetail(p));
     tbody.appendChild(tr);
   });
 }
 
+// ---- Payment detail (landing page) ----
+
+let detailPayment = null;
+
+function openPaymentDetail(payment) {
+  if (!detailEvent) return;
+  const ev = detailEvent;
+  detailPayment = payment;
+
+  const ref = (window.receiptRefFor ? window.receiptRefFor(ev, payment) : (payment.id ? 'PMT-' + payment.id : ''));
+  document.getElementById('pd-code').textContent = ref;
+  document.getElementById('pd-crumb').textContent = ref;
+
+  const currency = ev.discount_currency || 'UGX';
+  document.getElementById('pd-amount').textContent = currency + ' ' + formatMoney(Number(payment.amount) || 0);
+  document.getElementById('pd-paidby').textContent = payment.paid_by || '—';
+  document.getElementById('pd-date').textContent = formatLongDate(payment.date);
+  document.getElementById('pd-method').textContent = payment.method || '—';
+
+  const eventLabel = (ev.code ? ev.code + ' – ' : '') + (ev.client_name || ev.title || '');
+  const evEl = document.getElementById('pd-event');
+  evEl.textContent = eventLabel;
+  evEl.onclick = () => openEventDetail(ev);
+
+  // Breakdown: the products this payment was allocated to
+  const tbody = document.getElementById('pd-breakdown');
+  tbody.innerHTML = '';
+  const items = payment.items || [];
+  const rows = items.length
+    ? items.map(it => {
+        const prod = (ev.products || []).find(pr => (pr.title || '').trim() === (it.product_title || '').trim()) || {};
+        const total = (typeof prod.line_total === 'number') ? prod.line_total : 0;
+        const bal = (typeof prod.balance === 'number') ? prod.balance : 0;
+        return { title: it.product_title || '—', total: total, paid: Number(it.amount) || 0, balance: bal };
+      })
+    : [{ title: '—', total: 0, paid: Number(payment.amount) || 0, balance: 0 }];
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.title)}</td>
+      <td class="num">${formatMoney(r.total)}</td>
+      <td class="num">${formatMoney(r.paid)}</td>
+      <td class="num">${formatMoney(r.balance)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  setActiveView('payment-detail');
+}
+
+// Format "2026-06-29" -> "Monday 29 June 2026"
+function formatLongDate(iso) {
+  const parts = String(iso || '').split('-');
+  if (parts.length !== 3) return String(iso || '');
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  if (isNaN(d.getTime())) return String(iso || '');
+  return days[d.getDay()] + ' ' + Number(parts[2]) + ' ' + months[Number(parts[1]) - 1] + ' ' + parts[0];
+}
+
+document.getElementById('pd-back').addEventListener('click', () => {
+  if (detailEvent) openEventDetail(detailEvent);
+  else setActiveView('dashboard');
+});
+
+document.getElementById('pd-receipt').addEventListener('click', () => {
+  if (!detailPayment) return;
+  try {
+    window.downloadPaymentReceiptPDF(detailEvent, detailPayment, formatMoney);
+  } catch (e) { toast('Could not build receipt: ' + e.message); }
+});
+
+document.getElementById('pd-edit').addEventListener('click', () => {
+  if (detailPayment) openPaymentForm(detailPayment);
+});
+
+document.getElementById('pd-delete').addEventListener('click', async () => {
+  if (!detailPayment) return;
+  if (!confirm('Delete this payment? This cannot be undone.')) return;
+  try {
+    await api(`/api/payments/${detailPayment.id}`, { method: 'DELETE' });
+    toast('Payment removed');
+    const fresh = await api(`/api/events/${detailEvent.id}`);
+    detailEvent = fresh;
+    await loadAll();
+    openEventDetail(fresh);
+  } catch (e) { toast(e.message); }
+});
+
 // ---- New Payment full page ----
+
+let pfEditingOriginalAmount = 0;
 
 function pfRecompute() {
   const ev = detailEvent || {};
@@ -520,24 +596,39 @@ function pfRecompute() {
   document.getElementById('pf-amount').value = allocated ? allocated : '';
 
   const total = t.total || 0;
-  const alreadyPaid = t.paid || 0;
+  // When editing, remove this payment's original amount from the baseline so
+  // it isn't counted twice.
+  const alreadyPaid = (t.paid || 0) - (pfEditingOriginalAmount || 0);
   const newPaid = alreadyPaid + allocated;
   document.getElementById('pf-total').textContent = formatMoney(total);
   document.getElementById('pf-paid').textContent = formatMoney(newPaid);
   document.getElementById('pf-balance').textContent = formatMoney(total - newPaid);
 }
 
-function openPaymentForm() {
+function openPaymentForm(editPayment) {
   if (!detailEvent) return;
   const ev = detailEvent;
   ensureTotals(ev);
+  const editing = editPayment && editPayment.id != null;
+  pfEditingOriginalAmount = editing ? (Number(editPayment.amount) || 0) : 0;
+
   document.getElementById('pf-event-id').value = ev.id;
+  document.getElementById('pf-payment-id').value = editing ? editPayment.id : '';
+  document.getElementById('pf-crumb').textContent = editing ? 'Edit Payment' : 'New Payment';
+  document.getElementById('pf-save').innerHTML = editing ? '&#128077; Update Payment' : '&#128077; Create Payment';
+
   const label = (ev.code ? ev.code + '  ·  ' : '') + (ev.client_name || ev.title || '');
   document.getElementById('pf-event').value = label;
-  document.getElementById('pf-date').value = todayISO();
-  document.getElementById('pf-paid-by').value = ev.client_name || '';
-  document.getElementById('pf-method').value = 'Cash';
+  document.getElementById('pf-date').value = editing ? (editPayment.date || todayISO()) : todayISO();
+  document.getElementById('pf-paid-by').value = editing ? (editPayment.paid_by || '') : (ev.client_name || '');
+  document.getElementById('pf-method').value = editing ? (editPayment.method || 'Cash') : 'Cash';
   document.getElementById('pf-amount').value = '';
+
+  // Map existing allocations (when editing) by product title
+  const existing = {};
+  if (editing) (editPayment.items || []).forEach(it => {
+    existing[(it.product_title || '').trim()] = Number(it.amount) || 0;
+  });
 
   // Build the per-product allocation rows (Product / Balance / Amount Paying)
   const wrap = document.getElementById('pf-products');
@@ -549,7 +640,12 @@ function openPaymentForm() {
     const lineTotal = (typeof p.line_total === 'number')
       ? p.line_total
       : (Number(p.days || 1) * Number(p.qty || 1) * Number(p.unit_price || 0));
-    const bal = (typeof p.balance === 'number') ? p.balance : lineTotal;
+    let bal = (typeof p.balance === 'number') ? p.balance : lineTotal;
+    const title = (p.title || '').trim();
+    const preset = existing[title] || 0;
+    // When editing, this payment's allocation is already counted in the
+    // balance, so add it back to show the balance excluding this payment.
+    if (editing) bal = Math.round((bal + preset) * 100) / 100;
     const row = document.createElement('div');
     row.className = 'pf-prod-row';
     row.dataset.title = p.title || '';
@@ -561,6 +657,7 @@ function openPaymentForm() {
       </span>
     `;
     const input = row.querySelector('.pf-pay-input');
+    if (preset > 0) input.value = preset;
     input.addEventListener('input', pfRecompute);
     wrap.appendChild(row);
   });
@@ -569,10 +666,12 @@ function openPaymentForm() {
   setActiveView('payment-form');
 }
 
-document.getElementById('ed-add-payment').addEventListener('click', openPaymentForm);
+document.getElementById('ed-add-payment').addEventListener('click', () => openPaymentForm());
 
 function closePaymentForm() {
-  // return to the event detail page
+  // If we were editing, return to that payment's landing page; otherwise the event.
+  const editId = document.getElementById('pf-payment-id').value;
+  if (editId && detailPayment) { openPaymentDetail(detailPayment); return; }
   if (detailEvent) openEventDetail(detailEvent);
   else setActiveView('dashboard');
 }
@@ -589,6 +688,8 @@ document.getElementById('pf-save').addEventListener('click', async () => {
     const amt = Number(row.querySelector('.pf-pay-input').value) || 0;
     if (amt > 0) items.push({ product_title: row.dataset.title || '', amount: amt });
   });
+  const editId = document.getElementById('pf-payment-id').value;
+  const editing = !!editId;
   const payload = {
     event_id: Number(document.getElementById('pf-event-id').value),
     amount: Number(document.getElementById('pf-amount').value) || 0,
@@ -603,12 +704,24 @@ document.getElementById('pf-save').addEventListener('click', async () => {
   paymentSaving = true;
   btn.disabled = true; btn.style.opacity = '0.6';
   try {
-    await api('/api/payments', { method: 'POST', body: JSON.stringify(payload) });
-    toast('Payment recorded');
+    if (editing) {
+      await api(`/api/payments/${editId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      toast('Payment updated');
+    } else {
+      await api('/api/payments', { method: 'POST', body: JSON.stringify(payload) });
+      toast('Payment recorded');
+    }
     const fresh = await api(`/api/events/${payload.event_id}`);
     detailEvent = fresh;
     await loadAll();
-    openEventDetail(fresh);   // land back on the event detail with updated balance
+    if (editing) {
+      // Return to the payment's landing page with refreshed figures
+      const updated = (fresh.payments || []).find(p => String(p.id) === String(editId));
+      if (updated) openPaymentDetail(updated);
+      else openEventDetail(fresh);
+    } else {
+      openEventDetail(fresh);   // land back on the event detail with updated balance
+    }
   } catch (e) {
     toast(e.message);
   } finally {

@@ -1045,6 +1045,41 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
 
 .detail-notes { color: var(--text-muted); font-size: 14.5px; white-space: pre-wrap; }
 
+/* Clickable payment rows */
+.pay-row-clickable { cursor: pointer; }
+.pay-row-clickable:hover td { background: #f4f7ff; }
+
+/* ---- Payment detail (landing page) ---- */
+.pd-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.pd-code {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+.pd-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.pd-details {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  max-width: 520px;
+  margin-bottom: 8px;
+}
+.pd-field { display: flex; flex-direction: column; gap: 3px; }
+.pd-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
+.pd-value { font-size: 14.5px; color: var(--text-muted); }
+.pd-event-link { color: var(--navy); cursor: pointer; text-decoration: underline; width: fit-content; }
+.detail-table-breakdown { min-width: 0; }
+
 @media (max-width: 800px) {
   /* On mobile the sidebar becomes a pull-out drawer over the content */
   .sidebar {
@@ -1216,17 +1251,17 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
     word-break: break-word;
     white-space: normal;
   }
-  .detail-table-payments th:nth-child(1), .detail-table-payments td:nth-child(1) { width: 16%; }
-  .detail-table-payments th:nth-child(2), .detail-table-payments td:nth-child(2) { width: 13%; }
-  .detail-table-payments th:nth-child(3), .detail-table-payments td:nth-child(3) { width: 17%; }
-  .detail-table-payments th:nth-child(4), .detail-table-payments td:nth-child(4) { width: 24%; }
-  .detail-table-payments th:nth-child(5), .detail-table-payments td:nth-child(5) { width: 17%; }
-  .detail-table-payments th:nth-child(6), .detail-table-payments td:nth-child(6) { width: 13%; }
+  .detail-table-payments th:nth-child(1), .detail-table-payments td:nth-child(1) { width: 19%; }
+  .detail-table-payments th:nth-child(2), .detail-table-payments td:nth-child(2) { width: 15%; }
+  .detail-table-payments th:nth-child(3), .detail-table-payments td:nth-child(3) { width: 20%; }
+  .detail-table-payments th:nth-child(4), .detail-table-payments td:nth-child(4) { width: 27%; }
+  .detail-table-payments th:nth-child(5), .detail-table-payments td:nth-child(5) { width: 19%; }
   .pay-for-cell { font-size: 9px; max-width: none; }
 
-  /* Shrink the receipt button to just its icon so the row fits */
-  .pay-actions { white-space: normal; }
-  .pay-receipt-label { display: none; }
-  .pay-receipt-btn { padding: 4px 6px; margin-right: 4px; font-size: 12px; }
-  .pay-del-btn { width: 22px; height: 22px; font-size: 12px; }
+  /* Payment detail landing page on phones */
+  .pd-code { font-size: 20px; }
+  .pd-actions { width: 100%; }
+  .pd-actions .btn-invoice-pill, .pd-actions .btn-create-pill, .pd-actions .btn-cancel-pill {
+    flex: 1; padding: 10px 8px; font-size: 12px;
+  }
 }

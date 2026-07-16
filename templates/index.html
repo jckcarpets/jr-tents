@@ -181,7 +181,6 @@
               <th>Paid By</th>
               <th>For (Products)</th>
               <th class="num">Amount</th>
-              <th></th>
             </tr>
           </thead>
           <tbody id="ed-payments-tbody"></tbody>
@@ -198,6 +197,51 @@
       </div>
     </section>
 
+    <!-- ================= PAYMENT DETAIL (landing page) ================= -->
+    <section id="view-payment-detail" class="view hidden">
+      <div class="breadcrumb">
+        <button id="pd-back" class="crumb-back" title="Back">&#8592;</button>
+        <span class="crumb-home">&#127968;</span>
+        <span class="crumb-sep">&gt;</span>
+        <span>Payments</span>
+        <span class="crumb-sep">&gt;</span>
+        <span id="pd-crumb" class="crumb-current"></span>
+      </div>
+
+      <div class="pd-header-row">
+        <h1 class="pd-code" id="pd-code"></h1>
+        <div class="pd-actions">
+          <button id="pd-receipt" class="btn-invoice-pill">&#128229; Download Receipt</button>
+          <button id="pd-edit" class="btn-create-pill">&#9998; Edit</button>
+          <button id="pd-delete" class="btn-cancel-pill">&#128465; Delete</button>
+        </div>
+      </div>
+
+      <h2 class="form-heading">Payment Details</h2>
+      <div class="pd-details">
+        <div class="pd-field"><span class="pd-label">Amount Paid</span><span class="pd-value" id="pd-amount"></span></div>
+        <div class="pd-field"><span class="pd-label">Paid By</span><span class="pd-value" id="pd-paidby"></span></div>
+        <div class="pd-field"><span class="pd-label">Paid On</span><span class="pd-value" id="pd-date"></span></div>
+        <div class="pd-field"><span class="pd-label">Paid Via</span><span class="pd-value" id="pd-method"></span></div>
+        <div class="pd-field"><span class="pd-label">For Event</span><span class="pd-value pd-event-link" id="pd-event"></span></div>
+      </div>
+
+      <h2 class="form-heading">Payment Breakdown</h2>
+      <div class="detail-table-wrap">
+        <table class="detail-table detail-table-breakdown">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="num">Total Amount</th>
+              <th class="num">Paid Amount</th>
+              <th class="num">Current Balance</th>
+            </tr>
+          </thead>
+          <tbody id="pd-breakdown"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ================= NEW PAYMENT (full page) ================= -->
     <section id="view-payment-form" class="view hidden">
       <div class="breadcrumb">
@@ -206,10 +250,11 @@
         <span class="crumb-sep">&gt;</span>
         <span>Payments</span>
         <span class="crumb-sep">&gt;</span>
-        <span class="crumb-current">New Payment</span>
+        <span class="crumb-current" id="pf-crumb">New Payment</span>
       </div>
 
       <input type="hidden" id="pf-event-id">
+      <input type="hidden" id="pf-payment-id">
 
       <h2 class="form-heading">Details</h2>
 

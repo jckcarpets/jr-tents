@@ -469,6 +469,52 @@ def create_payment():
     return jsonify({'id': new_id}), 201
 
 
+@app.route('/api/payments/<int:payment_id>', methods=['PUT'])
+def update_payment(payment_id):
+    data = request.get_json(force=True)
+
+    raw_items = data.get('items') or []
+    items = []
+    for it in raw_items:
+        try:
+            amt = float(it.get('amount') or 0)
+        except (TypeError, ValueError):
+            amt = 0
+        if amt > 0:
+            items.append({'product_title': (it.get('product_title') or '').strip(), 'amount': amt})
+
+    if items:
+        amount = round(sum(i['amount'] for i in items), 2)
+    else:
+        try:
+            amount = float(data.get('amount') or 0)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'amount must be a number'}), 400
+
+    if amount <= 0:
+        return jsonify({'error': 'amount must be greater than zero'}), 400
+
+    conn = get_db()
+    row = conn.execute('SELECT id FROM payments WHERE id=?', (payment_id,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'not found'}), 404
+    conn.execute(
+        'UPDATE payments SET amount=?, date=?, method=?, paid_by=? WHERE id=?',
+        (amount, data.get('date') or now_iso()[:10], data.get('method'),
+         data.get('paid_by'), payment_id)
+    )
+    conn.execute('DELETE FROM payment_items WHERE payment_id=?', (payment_id,))
+    for it in items:
+        conn.execute(
+            'INSERT INTO payment_items (payment_id, product_title, amount) VALUES (?, ?, ?)',
+            (payment_id, it['product_title'], it['amount'])
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/api/payments/<int:payment_id>', methods=['DELETE'])
 def delete_payment(payment_id):
     conn = get_db()
