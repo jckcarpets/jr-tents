@@ -43,7 +43,7 @@
       <div class="nav-item" data-view="dashboard">
         <span class="nav-icon">&#127915;</span> Events
       </div>
-      <div class="nav-item disabled" data-view="soon">
+      <div class="nav-item" data-view="payments">
         <span class="nav-icon">&#128179;</span> Payments
       </div>
 
@@ -162,6 +162,31 @@
         </table>
       </div>
       <div id="ed-tax-note" class="detail-tax-note"></div>
+
+      <div class="pay-heading-row">
+        <h2 class="form-heading">Payments</h2>
+        <button id="ed-add-payment" class="pill-add-btn">&#10133; Add Payment</button>
+      </div>
+      <div class="pay-summary">
+        <div class="pay-sum-item"><span>Total</span><span id="ed-pay-total">0</span></div>
+        <div class="pay-sum-item"><span>Paid</span><span id="ed-pay-paid">0</span></div>
+        <div class="pay-sum-item pay-balance"><span>Balance</span><span id="ed-pay-balance">0</span></div>
+      </div>
+      <div class="detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Mode</th>
+              <th>Paid By</th>
+              <th class="num">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ed-payments-tbody"></tbody>
+        </table>
+        <div id="ed-payments-empty" class="empty-state hidden">No payments recorded yet.</div>
+      </div>
 
       <h2 class="form-heading">Notes</h2>
       <div id="ed-notes" class="detail-notes"></div>
@@ -303,6 +328,30 @@
       <button id="ef-delete" class="btn-danger hidden" style="margin-top:10px;">Delete this event</button>
     </section>
 
+    <!-- ================= PAYMENTS REGISTER VIEW ================= -->
+    <section id="view-payments" class="view hidden">
+      <div class="topbar">
+        <h1>Payments</h1>
+        <div id="pay-register-summary" class="pay-register-summary"></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Event</th>
+              <th>Mode</th>
+              <th>Paid By</th>
+              <th class="num">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="payments-tbody"></tbody>
+        </table>
+        <div id="payments-register-empty" class="empty-state hidden">No payments recorded yet. Open an event and add a payment.</div>
+      </div>
+    </section>
+
     <!-- ================= COMING SOON VIEW ================= -->
     <section id="view-soon" class="view hidden">
       <div class="topbar"><h1>Coming soon</h1></div>
@@ -321,11 +370,44 @@
       <div class="popup-row"><span class="popup-label">Date</span><span id="ep-date"></span></div>
       <div class="popup-row"><span class="popup-label">Location</span><span id="ep-location"></span></div>
       <div class="popup-row"><span class="popup-label">Total</span><span id="ep-total" class="popup-total"></span></div>
+      <div class="popup-row"><span class="popup-label">Balance</span><span id="ep-balance" class="popup-total"></span></div>
     </div>
     <div class="modal-actions">
       <div class="spacer"></div>
       <button id="ep-close" class="btn-secondary">Close</button>
       <button id="ep-more" class="btn-primary">More &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PAYMENT MODAL ================= -->
+<div id="payment-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>Add Payment</h2>
+    <input type="hidden" id="payment-event-id">
+
+    <label>Amount</label>
+    <input type="number" id="payment-amount" min="0" step="any" placeholder="0">
+
+    <label>Date</label>
+    <input type="date" id="payment-date">
+
+    <label>Mode of Payment</label>
+    <select id="payment-method">
+      <option>Cash</option>
+      <option>Mobile Money</option>
+      <option>Bank Transfer</option>
+      <option>Cheque</option>
+      <option>Other</option>
+    </select>
+
+    <label>Paid By</label>
+    <input type="text" id="payment-paid-by" placeholder="Name of who paid">
+
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="payment-cancel" class="btn-secondary">Cancel</button>
+      <button id="payment-save" class="btn-primary">Save Payment</button>
     </div>
   </div>
 </div>

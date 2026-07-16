@@ -225,14 +225,23 @@ def get_events():
             FROM event_products GROUP BY event_id
         ''')
         sub_rows = cur.fetchall()
+        cur.execute('''
+            SELECT event_id, COALESCE(SUM(amount), 0) AS paid
+            FROM payments GROUP BY event_id
+        ''')
+        pay_rows = cur.fetchall()
     put_db(conn)
     subtotals = {r['event_id']: float(r['subtotal']) for r in sub_rows}
+    paids = {r['event_id']: float(r['paid']) for r in pay_rows}
     out = []
     for r in rows:
         d = clean_row(r)
         d['totals'] = totals_from_subtotal(
             subtotals.get(d['id'], 0), bool(d.get('tax_inclusive')),
             d.get('tax_type') or 'no_tax', d.get('discount_amount') or 0)
+        paid = float(paids.get(d['id'], 0) or 0)
+        d['totals']['paid'] = round(paid, 2)
+        d['totals']['balance'] = round(d['totals']['total'] - paid, 2)
         out.append(d)
     return jsonify(out)
 
@@ -255,14 +264,23 @@ def get_event(event_id):
             (event_id,)
         )
         products = cur.fetchall()
+        cur.execute(
+            'SELECT * FROM payments WHERE event_id=%s ORDER BY date, id',
+            (event_id,)
+        )
+        payments = cur.fetchall()
     put_db(conn)
 
     data = clean_row(row)
     data['products'] = [clean_row(p) for p in products]
+    data['payments'] = [clean_row(p) for p in payments]
     data['totals'] = compute_totals(
         data['products'], bool(data.get('tax_inclusive')), data.get('tax_type') or 'no_tax',
         data.get('discount_amount') or 0
     )
+    paid = sum(float(p['amount'] or 0) for p in payments)
+    data['totals']['paid'] = round(paid, 2)
+    data['totals']['balance'] = round(data['totals']['total'] - paid, 2)
     return jsonify(data)
 
 
@@ -357,6 +375,60 @@ def delete_event(event_id):
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute('DELETE FROM events WHERE id=%s', (event_id,))
+    conn.commit()
+    put_db(conn)
+    return jsonify({'status': 'ok'})
+
+
+# ---------- Payments ----------
+
+@app.route('/api/payments', methods=['GET'])
+def get_payments():
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute('''
+            SELECT payments.*, events.code AS event_code, events.title AS event_title,
+                   clients.name AS client_name
+            FROM payments
+            LEFT JOIN events ON payments.event_id = events.id
+            LEFT JOIN clients ON events.client_id = clients.id
+            ORDER BY payments.date DESC, payments.id DESC
+        ''')
+        rows = cur.fetchall()
+    put_db(conn)
+    return jsonify([clean_row(r) for r in rows])
+
+
+@app.route('/api/payments', methods=['POST'])
+def create_payment():
+    data = request.get_json(force=True)
+    event_id = data.get('event_id')
+    if not event_id:
+        return jsonify({'error': 'event is required'}), 400
+    try:
+        amount = float(data.get('amount') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'amount must be a number'}), 400
+    if amount <= 0:
+        return jsonify({'error': 'amount must be greater than zero'}), 400
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute(
+            'INSERT INTO payments (event_id, amount, date, method, paid_by) '
+            'VALUES (%s, %s, %s, %s, %s) RETURNING id',
+            (event_id, amount, data.get('date'), data.get('method'), data.get('paid_by'))
+        )
+        new_id = cur.fetchone()['id']
+    conn.commit()
+    put_db(conn)
+    return jsonify({'id': new_id}), 201
+
+
+@app.route('/api/payments/<int:payment_id>', methods=['DELETE'])
+def delete_payment(payment_id):
+    conn = get_db()
+    with conn.cursor() as cur:
+        cur.execute('DELETE FROM payments WHERE id=%s', (payment_id,))
     conn.commit()
     put_db(conn)
     return jsonify({'status': 'ok'})

@@ -86,6 +86,7 @@ function setActiveView(view) {
 
   if (view === 'clients') renderClientsTable();
   if (view === 'dashboard') renderDashboard();
+  if (view === 'payments') renderPaymentsRegister();
 }
 
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -313,11 +314,14 @@ function ensureTotals(ev) {
     taxAmount = taxableBase * rate;
     total = taxableBase + taxAmount;
   }
+  const paid = (ev.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
   ev.totals = {
     subtotal: subtotal,
     discount_amount: discount,
     tax_amount: taxAmount,
     total: total,
+    paid: paid,
+    balance: total - paid,
   };
   return ev;
 }
@@ -330,6 +334,9 @@ function renderPopupFields(ev, totalText) {
   document.getElementById('ep-date').textContent = formatDateRange(ev);
   document.getElementById('ep-location').textContent = ev.location || '—';
   document.getElementById('ep-total').textContent = totalText;
+  const currency = ev.discount_currency || 'UGX';
+  const bal = ev.totals && typeof ev.totals.balance === 'number' ? ev.totals.balance : null;
+  document.getElementById('ep-balance').textContent = bal === null ? '…' : formatMoney(bal);
 }
 
 function openEventPopup(eventId) {
@@ -442,7 +449,126 @@ function openEventDetail(ev) {
   document.getElementById('ed-notes').textContent =
     ev.notes || 'No notes have been added to this event.';
 
+  renderDetailPayments(ev);
+
   setActiveView('event-detail');
+}
+
+function renderDetailPayments(ev) {
+  ensureTotals(ev);
+  const payments = ev.payments || [];
+  const total = (ev.totals && ev.totals.total) || 0;
+  const paid = (ev.totals && typeof ev.totals.paid === 'number')
+    ? ev.totals.paid
+    : payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const balance = (ev.totals && typeof ev.totals.balance === 'number')
+    ? ev.totals.balance
+    : total - paid;
+
+  document.getElementById('ed-pay-total').textContent = formatMoney(total);
+  document.getElementById('ed-pay-paid').textContent = formatMoney(paid);
+  document.getElementById('ed-pay-balance').textContent = formatMoney(balance);
+
+  const tbody = document.getElementById('ed-payments-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('ed-payments-empty').classList.toggle('hidden', payments.length > 0);
+  payments.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(p.date || '')}</td>
+      <td>${escapeHtml(p.method || '')}</td>
+      <td>${escapeHtml(p.paid_by || '')}</td>
+      <td class="num">${formatMoney(Number(p.amount) || 0)}</td>
+      <td class="num"><button class="pay-del-btn" title="Delete">&times;</button></td>
+    `;
+    tr.querySelector('.pay-del-btn').addEventListener('click', async () => {
+      try {
+        await api(`/api/payments/${p.id}`, { method: 'DELETE' });
+        toast('Payment removed');
+        const fresh = await api(`/api/events/${ev.id}`);
+        detailEvent = fresh;
+        renderDetailPayments(fresh);
+        await loadAll();
+      } catch (e) { toast(e.message); }
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+// ---- Add-payment modal ----
+
+document.getElementById('ed-add-payment').addEventListener('click', () => {
+  if (!detailEvent) return;
+  document.getElementById('payment-event-id').value = detailEvent.id;
+  document.getElementById('payment-amount').value = '';
+  document.getElementById('payment-date').value = todayISO();
+  document.getElementById('payment-method').value = 'Cash';
+  document.getElementById('payment-paid-by').value = detailEvent.client_name || '';
+  document.getElementById('payment-modal').classList.remove('hidden');
+});
+
+document.getElementById('payment-cancel').addEventListener('click', () => {
+  document.getElementById('payment-modal').classList.add('hidden');
+});
+
+let paymentSaving = false;
+document.getElementById('payment-save').addEventListener('click', async () => {
+  if (paymentSaving) return;
+  const payload = {
+    event_id: Number(document.getElementById('payment-event-id').value),
+    amount: Number(document.getElementById('payment-amount').value) || 0,
+    date: document.getElementById('payment-date').value,
+    method: document.getElementById('payment-method').value,
+    paid_by: document.getElementById('payment-paid-by').value.trim(),
+  };
+  if (payload.amount <= 0) { toast('Enter an amount greater than zero'); return; }
+
+  const btn = document.getElementById('payment-save');
+  paymentSaving = true;
+  btn.disabled = true; btn.style.opacity = '0.6';
+  try {
+    await api('/api/payments', { method: 'POST', body: JSON.stringify(payload) });
+    toast('Payment recorded');
+    document.getElementById('payment-modal').classList.add('hidden');
+    const fresh = await api(`/api/events/${payload.event_id}`);
+    detailEvent = fresh;
+    renderDetailPayments(fresh);
+    await loadAll();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    paymentSaving = false;
+    btn.disabled = false; btn.style.opacity = '';
+  }
+});
+
+// ---- Payments register (sidebar) ----
+
+async function renderPaymentsRegister() {
+  const tbody = document.getElementById('payments-tbody');
+  tbody.innerHTML = '';
+  let payments = [];
+  try {
+    payments = await api('/api/payments');
+  } catch (e) {
+    toast(e.message);
+  }
+  document.getElementById('payments-register-empty').classList.toggle('hidden', payments.length > 0);
+  const total = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  document.getElementById('pay-register-summary').textContent =
+    payments.length ? `${payments.length} payment${payments.length > 1 ? 's' : ''} · ${formatMoney(total)} total` : '';
+  payments.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(p.date || '')}</td>
+      <td>${escapeHtml(p.client_name || '')}</td>
+      <td>${escapeHtml(p.event_code || p.event_title || '')}</td>
+      <td>${escapeHtml(p.method || '')}</td>
+      <td>${escapeHtml(p.paid_by || '')}</td>
+      <td class="num">${formatMoney(Number(p.amount) || 0)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 document.getElementById('event-detail-back').addEventListener('click', () => setActiveView('dashboard'));
