@@ -227,64 +227,65 @@
     const logoIdx = logoImg ? doc.addImage(logoImg) : 0;
     let y = 58;
 
-    // Header — logo image top-left (exact artwork from static/logo.png);
-    // falls back to styled text if the file is missing.
-    let leftBottom;
-    if (logoImg) {
-      const logoW = 160;
-      const logoH = logoW * (logoImg.h / logoImg.w);
-      doc.drawImage(logoIdx, MARGIN, 42, logoW, logoH);
-      // Address block sits BESIDE the logo, to its right
-      const addrX = MARGIN + logoW + 18;
-      let ly = 48;
-      ADDRESS_LINES.forEach(line => {
-        doc.text(addrX, ly, line, 9, { color: GRAY });
-        ly += 12;
-      });
-      leftBottom = Math.max(42 + logoH, ly - 6);
-    } else {
-      doc.text(MARGIN, y, 'J&R TENTS', 26, { bold: true, color: BLUE });
-      let ly = y + 16;
-      ADDRESS_LINES.forEach(line => {
-        doc.text(MARGIN, ly, line, 9, { color: GRAY });
-        ly += 12;
-      });
-      leftBottom = ly - 6;
-    }
-
     const R = PAGE_W - MARGIN;
-    // Date the quotation is generated (today)
     const now = new Date();
     const todayStr = now.getFullYear() + '-' +
       String(now.getMonth() + 1).padStart(2, '0') + '-' +
       String(now.getDate()).padStart(2, '0');
-    // Shift the quotation details down so the block sits level with the
-    // lower part of the address block, rather than starting at the very top.
-    const metaTop = y + 50;
-    doc.text(R, metaTop, 'QUOTATION', 12, { bold: true, color: BLUE, align: 'right' });
 
-    // Two-column meta: labels right-aligned to a divider, values left-aligned
-    // after it so all values line up in a neat column.
+    // ---- RIGHT side: logo, with the address block stacked below it ----
+    let rightBottom;
+    let addrTop = 58;   // y where the address block starts (shared with left column)
+    if (logoImg) {
+      const logoW = 160;
+      const logoH = logoW * (logoImg.h / logoImg.w);
+      const logoX = R - logoW;             // logo right-aligned
+      doc.drawImage(logoIdx, logoX, 42, logoW, logoH);
+      addrTop = 42 + logoH + 14;
+      let ly = addrTop;
+      ADDRESS_LINES.forEach(line => {         // address left-aligned under logo
+        doc.text(logoX, ly, line, 9, { color: GRAY });
+        ly += 12;
+      });
+      rightBottom = ly - 6;
+    } else {
+      doc.text(R, 58, 'J&R TENTS', 26, { bold: true, color: BLUE, align: 'right' });
+      addrTop = 58 + 16;
+      let ly = addrTop;
+      ADDRESS_LINES.forEach(line => {
+        doc.text(R, ly, line, 9, { color: GRAY, align: 'right' });
+        ly += 12;
+      });
+      rightBottom = ly - 6;
+    }
+
+    // ---- LEFT side: quotation details ----
+    // Drop the QUOTATION heading down to share the last address line (Website).
+    const metaTop = addrTop + (ADDRESS_LINES.length - 1) * 12;
+    doc.text(MARGIN, metaTop, 'QUOTATION', 12, { bold: true, color: BLUE });
+
+    // Two-column meta. Third item = true means the value (the number) is bold.
     const metaPairs = [
-      ['Quotation #:', code],
-      ['Date:', todayStr],
-      ['Event date:', formatDateRange(ev)],
+      ['Quotation #:', code, false],
+      ['Date:', todayStr, true],
+      ['Event date:', formatDateRange(ev), true],
     ];
-    if (ev.category) metaPairs.push(['Category:', ev.category]);
-    metaPairs.push(['Classification:', (ev.classification || 'retail').toUpperCase()]);
+    if (ev.category) metaPairs.push(['Category:', ev.category, false]);
+    metaPairs.push(['Classification:', (ev.classification || 'retail').toUpperCase(), false]);
 
-    // Value column left edge: leave room for the widest value up to R.
-    let widestVal = 0;
-    metaPairs.forEach(([, v]) => { widestVal = Math.max(widestVal, textWidth(String(v), 9.5, false)); });
-    const valueX = R - widestVal;
+    // Value column: right-align labels to a divider, values left-aligned after.
+    let widestLabel = 0;
+    metaPairs.forEach(([l]) => { widestLabel = Math.max(widestLabel, textWidth(l, 9.5, false)); });
+    const labelRight = MARGIN + widestLabel;
+    const valueX = labelRight + 6;
     let metaY = metaTop + 16;
-    metaPairs.forEach(([label, value]) => {
-      doc.text(valueX - 6, metaY, label, 9.5, { color: GRAY, align: 'right' });
-      doc.text(valueX, metaY, String(value), 9.5, { color: GRAY });
+    metaPairs.forEach(([label, value, boldVal]) => {
+      doc.text(labelRight, metaY, label, 9.5, { color: GRAY, align: 'right' });
+      doc.text(valueX, metaY, String(value), 9.5, boldVal ? { bold: true, color: DARK } : { color: GRAY });
       metaY += 13;
     });
 
-    y = Math.max(leftBottom, metaY) + 14;
+    y = Math.max(rightBottom, metaY) + 14;
     doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, 2.2, BLUE);
     y += 24;
 
