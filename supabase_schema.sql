@@ -53,10 +53,18 @@ create table if not exists payments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists payment_items (
+  id bigint generated always as identity primary key,
+  payment_id bigint not null references payments (id) on delete cascade,
+  product_title text,
+  amount numeric default 0
+);
+
 create index if not exists idx_events_date on events (date);
 create index if not exists idx_events_client on events (client_id);
 create index if not exists idx_products_event on event_products (event_id);
 create index if not exists idx_payments_event on payments (event_id);
+create index if not exists idx_payment_items_payment on payment_items (payment_id);
 
 -- The app talks to the database directly (not through Supabase's public
 -- REST API), so we enable Row Level Security with NO policies. That locks
@@ -66,3 +74,4 @@ alter table clients enable row level security;
 alter table events enable row level security;
 alter table event_products enable row level security;
 alter table payments enable row level security;
+alter table payment_items enable row level security;

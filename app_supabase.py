@@ -269,11 +269,41 @@ def get_event(event_id):
             (event_id,)
         )
         payments = cur.fetchall()
+        cur.execute('''
+            SELECT payment_items.* FROM payment_items
+            JOIN payments ON payment_items.payment_id = payments.id
+            WHERE payments.event_id=%s
+        ''', (event_id,))
+        items = cur.fetchall()
     put_db(conn)
 
     data = clean_row(row)
     data['products'] = [clean_row(p) for p in products]
-    data['payments'] = [clean_row(p) for p in payments]
+
+    # Attach each payment's product allocation items
+    items_by_payment = {}
+    paid_by_title = {}
+    for it in items:
+        d = clean_row(it)
+        items_by_payment.setdefault(d['payment_id'], []).append(d)
+        title = (d.get('product_title') or '').strip()
+        paid_by_title[title] = paid_by_title.get(title, 0.0) + float(d.get('amount') or 0)
+    payments_out = []
+    for p in payments:
+        pd = clean_row(p)
+        pd['items'] = items_by_payment.get(pd['id'], [])
+        payments_out.append(pd)
+    data['payments'] = payments_out
+
+    # Per-product line total, paid, balance
+    for p in data['products']:
+        line = (float(p.get('days') or 1) * float(p.get('qty') or 1) * float(p.get('unit_price') or 0))
+        title = (p.get('title') or '').strip()
+        ppaid = round(paid_by_title.get(title, 0.0), 2)
+        p['line_total'] = round(line, 2)
+        p['paid'] = ppaid
+        p['balance'] = round(line - ppaid, 2)
+
     data['totals'] = compute_totals(
         data['products'], bool(data.get('tax_inclusive')), data.get('tax_type') or 'no_tax',
         data.get('discount_amount') or 0
@@ -405,12 +435,29 @@ def create_payment():
     event_id = data.get('event_id')
     if not event_id:
         return jsonify({'error': 'event is required'}), 400
-    try:
-        amount = float(data.get('amount') or 0)
-    except (TypeError, ValueError):
-        return jsonify({'error': 'amount must be a number'}), 400
+
+    # Per-product allocation items: [{product_title, amount}, ...]
+    raw_items = data.get('items') or []
+    items = []
+    for it in raw_items:
+        try:
+            amt = float(it.get('amount') or 0)
+        except (TypeError, ValueError):
+            amt = 0
+        if amt > 0:
+            items.append({'product_title': (it.get('product_title') or '').strip(), 'amount': amt})
+
+    if items:
+        amount = round(sum(i['amount'] for i in items), 2)
+    else:
+        try:
+            amount = float(data.get('amount') or 0)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'amount must be a number'}), 400
+
     if amount <= 0:
         return jsonify({'error': 'amount must be greater than zero'}), 400
+
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute(
@@ -419,6 +466,12 @@ def create_payment():
             (event_id, amount, data.get('date'), data.get('method'), data.get('paid_by'))
         )
         new_id = cur.fetchone()['id']
+        for it in items:
+            cur.execute(
+                'INSERT INTO payment_items (payment_id, product_title, amount) '
+                'VALUES (%s, %s, %s)',
+                (new_id, it['product_title'], it['amount'])
+            )
     conn.commit()
     put_db(conn)
     return jsonify({'id': new_id}), 201

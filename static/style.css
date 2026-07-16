@@ -806,6 +806,52 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   font-size: 16px;
 }
 
+/* ---- Per-product payment allocation table ---- */
+#pf-products-wrap { margin-bottom: 20px; }
+
+.pf-products-table {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pf-products-head,
+.pf-prod-row {
+  display: grid;
+  grid-template-columns: 1fr 130px 150px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.pf-products-head {
+  background: #f4f6fb;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pf-prod-row {
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.pf-col-name { font-weight: 600; color: var(--text); min-width: 0; word-break: break-word; }
+.pf-col-bal { color: var(--text-muted); }
+.pf-col-pay { display: flex; }
+
+.pf-pay-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.pay-for-cell { font-size: 12.5px; color: var(--text-muted); max-width: 240px; }
+
 .event-form-actions {
   display: flex;
   justify-content: flex-end;
@@ -969,6 +1015,8 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
 
 .pay-register-summary { font-size: 15px; font-weight: 600; color: var(--navy); }
 
+#pf-event[readonly] { background: #eef1f5; color: var(--text); font-weight: 600; }
+
 .pay-del-btn {
   border: none;
   background: #fdecea;
@@ -1076,4 +1124,45 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
     padding: 10px 16px;
     font-size: 12.5px;
   }
+
+  /* ---- Payments on mobile ---- */
+
+  /* Total / Paid / Balance cards stay in one compact row */
+  .pay-summary { gap: 6px; }
+  .pay-sum-item {
+    min-width: 0;
+    padding: 8px 8px;
+    flex: 1;
+  }
+  .pay-sum-item span:first-child { font-size: 9.5px; letter-spacing: 0; }
+  .pay-sum-item span:last-child { font-size: 13px; }
+
+  .pay-heading-row { gap: 6px; }
+  .pay-heading-row .pill-add-btn { padding: 8px 12px; font-size: 12px; }
+
+  /* Register table can scroll sideways instead of clipping its 6 columns */
+  #view-payments .table-wrap { overflow-x: auto; }
+  #view-payments .data-table { min-width: 560px; }
+  #view-payments .data-table th { font-size: 10px; padding: 9px 8px; }
+  #view-payments .data-table td { font-size: 11.5px; padding: 9px 8px; }
+  .pay-register-summary { font-size: 12.5px; }
+
+  /* New Payment page: fields stack, summary box full width */
+  #view-payment-form .field-row { flex-direction: column; gap: 14px; }
+  #view-payment-form .summary-box { max-width: none; width: 100%; }
+
+  /* Per-product allocation: tighten columns so it fits a phone */
+  .pf-products-head, .pf-prod-row {
+    grid-template-columns: 1fr 82px 96px;
+    gap: 6px;
+    padding: 9px 10px;
+  }
+  .pf-products-head { font-size: 10.5px; letter-spacing: 0.01em; }
+  .pf-prod-row { font-size: 12.5px; }
+  .pf-col-bal { font-size: 12px; }
+  .pf-pay-input { padding: 7px 8px; font-size: 13px; }
+
+  /* Detail payments table scrolls sideways for its extra column */
+  #view-event-detail .detail-table { min-width: 520px; }
+  .pay-for-cell { font-size: 11px; max-width: 160px; }
 }

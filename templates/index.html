@@ -179,6 +179,7 @@
               <th>Date</th>
               <th>Mode</th>
               <th>Paid By</th>
+              <th>For (Products)</th>
               <th class="num">Amount</th>
               <th></th>
             </tr>
@@ -194,6 +195,79 @@
       <div class="event-form-actions">
         <button id="ed-invoice-btn" class="btn-invoice-pill">&#11015; Download Quotation</button>
         <button id="ed-edit-btn" class="btn-create-pill">&#9998; Edit Event</button>
+      </div>
+    </section>
+
+    <!-- ================= NEW PAYMENT (full page) ================= -->
+    <section id="view-payment-form" class="view hidden">
+      <div class="breadcrumb">
+        <button id="pf-back" class="crumb-back" title="Back">&#8592;</button>
+        <span class="crumb-home">&#127968;</span>
+        <span class="crumb-sep">&gt;</span>
+        <span>Payments</span>
+        <span class="crumb-sep">&gt;</span>
+        <span class="crumb-current">New Payment</span>
+      </div>
+
+      <input type="hidden" id="pf-event-id">
+
+      <h2 class="form-heading">Details</h2>
+
+      <div class="field">
+        <label class="field-label">Event</label>
+        <input type="text" id="pf-event" readonly>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Payment Date</label>
+          <input type="date" id="pf-date">
+        </div>
+        <div class="field">
+          <label class="field-label">Paid By</label>
+          <input type="text" id="pf-paid-by" placeholder="Name of who paid">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">Payment Method</label>
+          <select id="pf-method">
+            <option>Cash</option>
+            <option>Mobile Money</option>
+            <option>Bank Transfer</option>
+            <option>Cheque</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Total Amount Paid</label>
+          <input type="number" id="pf-amount" min="0" step="any" placeholder="Amount" readonly>
+        </div>
+      </div>
+
+      <!-- Per-product allocation: which products this payment is for -->
+      <div class="field" id="pf-products-wrap">
+        <label class="field-label">Products &mdash; enter how much is being paid for each</label>
+        <div class="pf-products-table">
+          <div class="pf-products-head">
+            <span class="pf-col-name">Product</span>
+            <span class="pf-col-bal">Balance</span>
+            <span class="pf-col-pay">Amount Paying</span>
+          </div>
+          <div id="pf-products"></div>
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-row"><span>Total</span><span id="pf-total">0</span></div>
+        <div class="summary-row"><span>Already Paid</span><span id="pf-paid">0</span></div>
+        <div class="summary-row summary-total"><span>Balance</span><span id="pf-balance">0</span></div>
+      </div>
+
+      <div class="event-form-actions">
+        <button id="pf-cancel" class="btn-cancel-pill">&#10060; Cancel</button>
+        <button id="pf-save" class="btn-create-pill">&#128077; Create Payment</button>
       </div>
     </section>
 
@@ -376,38 +450,6 @@
       <div class="spacer"></div>
       <button id="ep-close" class="btn-secondary">Close</button>
       <button id="ep-more" class="btn-primary">More &rarr;</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================= PAYMENT MODAL ================= -->
-<div id="payment-modal" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2>Add Payment</h2>
-    <input type="hidden" id="payment-event-id">
-
-    <label>Amount</label>
-    <input type="number" id="payment-amount" min="0" step="any" placeholder="0">
-
-    <label>Date</label>
-    <input type="date" id="payment-date">
-
-    <label>Mode of Payment</label>
-    <select id="payment-method">
-      <option>Cash</option>
-      <option>Mobile Money</option>
-      <option>Bank Transfer</option>
-      <option>Cheque</option>
-      <option>Other</option>
-    </select>
-
-    <label>Paid By</label>
-    <input type="text" id="payment-paid-by" placeholder="Name of who paid">
-
-    <div class="modal-actions">
-      <div class="spacer"></div>
-      <button id="payment-cancel" class="btn-secondary">Cancel</button>
-      <button id="payment-save" class="btn-primary">Save Payment</button>
     </div>
   </div>
 </div>

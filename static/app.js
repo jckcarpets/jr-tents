@@ -473,11 +473,15 @@ function renderDetailPayments(ev) {
   tbody.innerHTML = '';
   document.getElementById('ed-payments-empty').classList.toggle('hidden', payments.length > 0);
   payments.forEach(p => {
+    const forText = (p.items && p.items.length)
+      ? p.items.map(it => `${it.product_title || '—'} (${formatMoney(Number(it.amount) || 0)})`).join(', ')
+      : '—';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(p.date || '')}</td>
       <td>${escapeHtml(p.method || '')}</td>
       <td>${escapeHtml(p.paid_by || '')}</td>
+      <td class="pay-for-cell">${escapeHtml(forText)}</td>
       <td class="num">${formatMoney(Number(p.amount) || 0)}</td>
       <td class="num"><button class="pay-del-btn" title="Delete">&times;</button></td>
     `;
@@ -495,45 +499,108 @@ function renderDetailPayments(ev) {
   });
 }
 
-// ---- Add-payment modal ----
+// ---- New Payment full page ----
 
-document.getElementById('ed-add-payment').addEventListener('click', () => {
+function pfRecompute() {
+  const ev = detailEvent || {};
+  const t = ev.totals || {};
+  let allocated = 0;
+  document.querySelectorAll('#pf-products .pf-prod-row').forEach(row => {
+    allocated += Number(row.querySelector('.pf-pay-input').value) || 0;
+  });
+  allocated = Math.round(allocated * 100) / 100;
+  document.getElementById('pf-amount').value = allocated ? allocated : '';
+
+  const total = t.total || 0;
+  const alreadyPaid = t.paid || 0;
+  const newPaid = alreadyPaid + allocated;
+  document.getElementById('pf-total').textContent = formatMoney(total);
+  document.getElementById('pf-paid').textContent = formatMoney(newPaid);
+  document.getElementById('pf-balance').textContent = formatMoney(total - newPaid);
+}
+
+function openPaymentForm() {
   if (!detailEvent) return;
-  document.getElementById('payment-event-id').value = detailEvent.id;
-  document.getElementById('payment-amount').value = '';
-  document.getElementById('payment-date').value = todayISO();
-  document.getElementById('payment-method').value = 'Cash';
-  document.getElementById('payment-paid-by').value = detailEvent.client_name || '';
-  document.getElementById('payment-modal').classList.remove('hidden');
-});
+  const ev = detailEvent;
+  ensureTotals(ev);
+  document.getElementById('pf-event-id').value = ev.id;
+  const label = (ev.code ? ev.code + '  ·  ' : '') + (ev.client_name || ev.title || '');
+  document.getElementById('pf-event').value = label;
+  document.getElementById('pf-date').value = todayISO();
+  document.getElementById('pf-paid-by').value = ev.client_name || '';
+  document.getElementById('pf-method').value = 'Cash';
+  document.getElementById('pf-amount').value = '';
 
-document.getElementById('payment-cancel').addEventListener('click', () => {
-  document.getElementById('payment-modal').classList.add('hidden');
-});
+  // Build the per-product allocation rows (Product / Balance / Amount Paying)
+  const wrap = document.getElementById('pf-products');
+  wrap.innerHTML = '';
+  const products = (ev.products || []).filter(p => (p.title || '').trim());
+  const pfWrap = document.getElementById('pf-products-wrap');
+  pfWrap.classList.toggle('hidden', products.length === 0);
+  products.forEach(p => {
+    const lineTotal = (typeof p.line_total === 'number')
+      ? p.line_total
+      : (Number(p.days || 1) * Number(p.qty || 1) * Number(p.unit_price || 0));
+    const bal = (typeof p.balance === 'number') ? p.balance : lineTotal;
+    const row = document.createElement('div');
+    row.className = 'pf-prod-row';
+    row.dataset.title = p.title || '';
+    row.innerHTML = `
+      <span class="pf-col-name">${escapeHtml(p.title || '')}</span>
+      <span class="pf-col-bal">${formatMoney(bal)}</span>
+      <span class="pf-col-pay">
+        <input type="number" class="pf-pay-input" min="0" step="any" placeholder="0">
+      </span>
+    `;
+    const input = row.querySelector('.pf-pay-input');
+    input.addEventListener('input', pfRecompute);
+    wrap.appendChild(row);
+  });
+
+  pfRecompute();
+  setActiveView('payment-form');
+}
+
+document.getElementById('ed-add-payment').addEventListener('click', openPaymentForm);
+
+function closePaymentForm() {
+  // return to the event detail page
+  if (detailEvent) openEventDetail(detailEvent);
+  else setActiveView('dashboard');
+}
+
+document.getElementById('pf-back').addEventListener('click', closePaymentForm);
+document.getElementById('pf-cancel').addEventListener('click', closePaymentForm);
 
 let paymentSaving = false;
-document.getElementById('payment-save').addEventListener('click', async () => {
+document.getElementById('pf-save').addEventListener('click', async () => {
   if (paymentSaving) return;
+  // Gather per-product allocations
+  const items = [];
+  document.querySelectorAll('#pf-products .pf-prod-row').forEach(row => {
+    const amt = Number(row.querySelector('.pf-pay-input').value) || 0;
+    if (amt > 0) items.push({ product_title: row.dataset.title || '', amount: amt });
+  });
   const payload = {
-    event_id: Number(document.getElementById('payment-event-id').value),
-    amount: Number(document.getElementById('payment-amount').value) || 0,
-    date: document.getElementById('payment-date').value,
-    method: document.getElementById('payment-method').value,
-    paid_by: document.getElementById('payment-paid-by').value.trim(),
+    event_id: Number(document.getElementById('pf-event-id').value),
+    amount: Number(document.getElementById('pf-amount').value) || 0,
+    date: document.getElementById('pf-date').value,
+    method: document.getElementById('pf-method').value,
+    paid_by: document.getElementById('pf-paid-by').value.trim(),
+    items: items,
   };
-  if (payload.amount <= 0) { toast('Enter an amount greater than zero'); return; }
+  if (payload.amount <= 0) { toast('Enter an amount for at least one product'); return; }
 
-  const btn = document.getElementById('payment-save');
+  const btn = document.getElementById('pf-save');
   paymentSaving = true;
   btn.disabled = true; btn.style.opacity = '0.6';
   try {
     await api('/api/payments', { method: 'POST', body: JSON.stringify(payload) });
     toast('Payment recorded');
-    document.getElementById('payment-modal').classList.add('hidden');
     const fresh = await api(`/api/events/${payload.event_id}`);
     detailEvent = fresh;
-    renderDetailPayments(fresh);
     await loadAll();
+    openEventDetail(fresh);   // land back on the event detail with updated balance
   } catch (e) {
     toast(e.message);
   } finally {
