@@ -251,7 +251,7 @@ def get_event(event_id):
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute('''
-            SELECT events.*, clients.name AS client_name
+            SELECT events.*, clients.name AS client_name, clients.phone AS client_phone
             FROM events LEFT JOIN clients ON events.client_id = clients.id
             WHERE events.id=%s
         ''', (event_id,))

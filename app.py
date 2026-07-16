@@ -254,7 +254,7 @@ def get_events():
 def get_event(event_id):
     conn = get_db()
     row = conn.execute('''
-        SELECT events.*, clients.name as client_name
+        SELECT events.*, clients.name as client_name, clients.phone as client_phone
         FROM events LEFT JOIN clients ON events.client_id = clients.id
         WHERE events.id=?
     ''', (event_id,)).fetchone()

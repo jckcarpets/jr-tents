@@ -445,4 +445,189 @@
       a.remove();
     }, 1000);
   };
+
+  // ---------------- Payment receipt layout ----------------
+
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+  // "2026-06-29" -> "29 June 2026"
+  function fmtLongDate(iso) {
+    const p = String(iso || '').split('-');
+    if (p.length !== 3) return String(iso || '');
+    const m = MONTHS[Number(p[1]) - 1] || p[1];
+    return Number(p[2]) + ' ' + m + ' ' + p[0];
+  }
+
+  // Stable 8-char reference derived from the event + payment id, so the same
+  // payment always produces the same reference on re-download.
+  function genReceiptRef(seed) {
+    const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // 32 chars, no confusable I/O/0/1
+    let h = 2166136261 >>> 0;
+    const s = String(seed);
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    let out = '';
+    for (let i = 0; i < 8; i++) {
+      // xorshift each step and read a high bit slice so successive chars vary
+      h ^= h << 13; h >>>= 0;
+      h ^= h >>> 17;
+      h ^= h << 5; h >>>= 0;
+      out += alpha[(h >>> 3) % alpha.length];
+    }
+    return out;
+  }
+
+  window.downloadPaymentReceiptPDF = async function (ev, payment, formatMoney) {
+    const currency = ev.discount_currency || 'UGX';
+    const products = ev.products || [];
+    const eventRef = ev.code || String(ev.id);
+    const ref = genReceiptRef(eventRef + ':' + (payment.id != null ? payment.id : (payment.date || '')));
+
+    // Amount paid in THIS receipt, per product title
+    const paidThis = {};
+    (payment.items || []).forEach(it => {
+      const t = (it.product_title || '').trim();
+      paidThis[t] = (paidThis[t] || 0) + (Number(it.amount) || 0);
+    });
+    const paymentTotal = Number(payment.amount) || 0;
+
+    const doc = new PdfDoc();
+    const logoImg = await loadImage('static/logo.png');
+    const logoIdx = logoImg ? doc.addImage(logoImg) : 0;
+    const R = PAGE_W - MARGIN;
+    const white = [1, 1, 1];
+    const ROW_GREY = [0.949, 0.949, 0.953];
+
+    // ---- LEFT: logo + address ----
+    let addrBottom = 58;
+    if (logoImg) {
+      const logoW = 150;
+      const logoH = logoW * (logoImg.h / logoImg.w);
+      doc.drawImage(logoIdx, MARGIN, 44, logoW, logoH);
+      let ly = 44 + logoH + 14;
+      ADDRESS_LINES.forEach(line => { doc.text(MARGIN, ly, line, 9, { color: GRAY }); ly += 12; });
+      addrBottom = ly;
+    } else {
+      doc.text(MARGIN, 62, 'J&R TENTS', 24, { bold: true, color: BLUE });
+      let ly = 82;
+      ADDRESS_LINES.forEach(line => { doc.text(MARGIN, ly, line, 9, { color: GRAY }); ly += 12; });
+      addrBottom = ly;
+    }
+
+    // ---- RIGHT: PAYMENT RECEIPT heading + meta ----
+    doc.text(R, 60, 'PAYMENT RECEIPT', 24, { bold: true, color: DARK, align: 'right' });
+    const headingLeft = R - textWidth('PAYMENT RECEIPT', 24, true);   // align meta under the heading
+    const eventDateStr = ev.end_date
+      ? fmtLongDate(ev.date) + ' - ' + fmtLongDate(ev.end_date)
+      : fmtLongDate(ev.date);
+    const metaRows = [
+      ['PAYMENT DATE:', fmtLongDate(payment.date)],
+      ['REFERENCE:', ref],
+      ['EVENT REFERENCE:', eventRef],
+    ];
+    if (ev.location) metaRows.push(['EVENT LOCATION:', ev.location]);
+    metaRows.push(['EVENT DATE:', eventDateStr]);
+    // Labels left-aligned; values left-aligned in a shared column after the
+    // widest label (matches the reference and keeps long values from ever
+    // overlapping their label). Long values shrink to fit up to the margin.
+    let widestLabel = 0;
+    metaRows.forEach(([l]) => { widestLabel = Math.max(widestLabel, textWidth(l, 10, true)); });
+    const metaLabelX = headingLeft;                 // start labels at the heading's left edge
+    const metaValX = metaLabelX + widestLabel + 12;
+    const metaValMaxW = R - metaValX;
+    let my = 88;
+    metaRows.forEach(([label, val]) => {
+      doc.text(metaLabelX, my, label, 10, { bold: true, color: BLUE });
+      let vs = 10;
+      while (vs > 7 && textWidth(String(val), vs, false) > metaValMaxW) vs -= 0.5;
+      doc.text(metaValX, my, String(val), vs, { color: DARK });
+      my += 18;
+    });
+
+    let y = Math.max(addrBottom, my) + 26;
+
+    // ---- CLIENT DETAILS ----
+    doc.text(MARGIN, y, 'CLIENT DETAILS', 10, { bold: true, color: BLUE });
+    doc.line(MARGIN, y + 6, MARGIN + 260, 1.4, BLUE);
+    y += 24;
+    doc.text(MARGIN, y, ev.client_name || ev.title || '', 13, { bold: true });
+    y += 15;
+    y += 24;
+
+    // ---- Products table ----
+    // Column layout: wide PRODUCT cell, then 3 equal value cells on the right.
+    const cellW = 95;
+    const balRight = R;
+    const paidRight = balRight - cellW;
+    const totalRight = paidRight - cellW;
+    const prodX = MARGIN + 10;
+    const balCenter = balRight - cellW / 2;
+    const paidCenter = paidRight - cellW / 2;
+    const totalCenter = totalRight - cellW / 2;
+
+    // Header — royal blue bar with white bold text
+    const headH = 22;
+    doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, headH, BLUE);
+    const hy = y + 15;
+    doc.text(prodX, hy, 'PRODUCT', 9, { bold: true, color: white });
+    doc.text(totalCenter, hy, 'TOTAL AMOUNT', 9, { bold: true, color: white, align: 'center' });
+    doc.text(paidCenter, hy, 'AMOUNT PAID', 9, { bold: true, color: white, align: 'center' });
+    doc.text(balCenter, hy, 'BALANCE', 9, { bold: true, color: white, align: 'center' });
+    y += headH + 4;
+
+    function prodRow(name, total, paid, balance, shaded) {
+      const rowH = 26;
+      if (shaded) doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, rowH, ROW_GREY);
+      const ty = y + 17;
+      // wrap product name within the product cell width
+      const maxW = totalRight - cellW - prodX - 8;
+      const nm = String(name || '');
+      let shown = nm;
+      if (textWidth(nm, 10, true) > maxW) {
+        while (shown.length > 4 && textWidth(shown + '…', 10, true) > maxW) shown = shown.slice(0, -1);
+        shown = shown + '…';
+      }
+      doc.text(prodX, ty, shown, 10, { bold: true, color: DARK });
+      doc.text(totalCenter, ty, formatMoney(total), 10, { color: DARK, align: 'center' });
+      doc.text(paidCenter, ty, formatMoney(paid), 10, { color: DARK, align: 'center' });
+      doc.text(balCenter, ty, formatMoney(balance), 10, { color: DARK, align: 'center' });
+      y += rowH;
+    }
+
+    if (products.length === 0) {
+      doc.text(prodX, y + 17, 'No products on this event.', 10, { color: GRAY });
+      y += 26;
+    }
+    products.forEach((p, i) => {
+      if (y + 26 > PAGE_H - 120) { doc.newPage(); y = 50; }
+      const title = (p.title || '').trim();
+      const lineTotal = (typeof p.line_total === 'number')
+        ? p.line_total
+        : (Number(p.days || 1) * Number(p.qty || 1) * Number(p.unit_price || 0));
+      const bal = (typeof p.balance === 'number') ? p.balance : lineTotal;
+      prodRow(title, lineTotal, paidThis[title] || 0, bal, i % 2 === 0);
+    });
+
+    // ---- TOTALS row (royal blue text only, no fill) ----
+    const totalBalance = (ev.totals && typeof ev.totals.balance === 'number')
+      ? ev.totals.balance
+      : products.reduce((s, p) => s + (Number(p.balance) || 0), 0);
+    const rowH = 26;
+    if (y + rowH > PAGE_H - 60) { doc.newPage(); y = 50; }
+    doc.line(totalRight - cellW, y, R, 1.2, BLUE);   // thin blue rule above the totals
+    const ty = y + 17;
+    doc.text(totalCenter, ty, 'TOTALS', 10, { bold: true, color: BLUE, align: 'center' });
+    doc.text(paidCenter, ty, currency + ' ' + formatMoney(paymentTotal), 10, { bold: true, color: BLUE, align: 'center' });
+    doc.text(balCenter, ty, currency + ' ' + formatMoney(totalBalance), 10, { bold: true, color: BLUE, align: 'center' });
+    y += rowH;
+
+    const bytes = doc.build();
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Payment ' + ref + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
 })();

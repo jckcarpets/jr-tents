@@ -1028,6 +1028,21 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   font-size: 13px;
 }
 
+.pay-actions { white-space: nowrap; }
+
+.pay-receipt-btn {
+  border: none;
+  background: #eaf0ff;
+  color: var(--navy);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+.pay-receipt-btn:hover { background: #dbe6ff; }
+
 .detail-notes { color: var(--text-muted); font-size: 14.5px; white-space: pre-wrap; }
 
 @media (max-width: 800px) {
