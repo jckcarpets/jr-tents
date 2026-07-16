@@ -484,7 +484,7 @@ function renderDetailPayments(ev) {
       <td class="pay-for-cell">${escapeHtml(forText)}</td>
       <td class="num">${formatMoney(Number(p.amount) || 0)}</td>
       <td class="num pay-actions">
-        <button class="pay-receipt-btn" title="Download receipt">&#128229; Receipt</button>
+        <button class="pay-receipt-btn" title="Download receipt">&#128229;<span class="pay-receipt-label"> Receipt</span></button>
         <button class="pay-del-btn" title="Delete">&times;</button>
       </td>
     `;

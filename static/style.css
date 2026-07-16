@@ -1115,11 +1115,13 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .breadcrumb { margin: -12px -5px 18px -5px; padding: 12px 14px; font-size: 12.5px; }
   .form-heading { font-size: 16px; margin: 20px 0 10px 0; }
 
-  /* Details on phones: labels start at the halfway point of the screen,
-     values finish flush at the right edge */
-  .detail-info { max-width: none; width: 50%; gap: 5px; margin-left: auto; }
-  .detail-info-row { font-size: 12px; gap: 8px; justify-content: space-between; }
-  .detail-info-row span:last-child { word-break: break-word; text-align: right; }
+  /* Details on phones: use the full screen width so long values (location,
+     category) never run off the right edge. Label on the left, value on the
+     right, value wraps if needed. */
+  .detail-info { max-width: none; width: 100%; gap: 7px; margin-left: 0; margin-top: 4px; }
+  .detail-info-row { font-size: 13px; gap: 12px; justify-content: space-between; }
+  .detail-info-label { flex-shrink: 0; }
+  .detail-info-row span:last-child { word-break: break-word; text-align: right; min-width: 0; }
 
   .detail-client { font-size: 14px; }
 
@@ -1130,6 +1132,27 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .detail-table tfoot td { padding: 5px 5px; }
   /* Amount Due row matches the size of the other figures on phones */
   .detail-table tfoot tr.grand td { font-size: 10.5px; }
+
+  /* Products table fits the whole screen (no sideways scroll): fixed layout,
+     product/dimension text wraps, the four number columns stay compact. */
+  .detail-table-products {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .detail-table-products th,
+  .detail-table-products td {
+    padding: 6px 3px;
+    font-size: 9.5px;
+    word-break: break-word;
+  }
+  .detail-table-products col,
+  .detail-table-products th:nth-child(1), .detail-table-products td:nth-child(1) { width: 27%; }
+  .detail-table-products th:nth-child(2), .detail-table-products td:nth-child(2) { width: 18%; }
+  .detail-table-products th:nth-child(3), .detail-table-products td:nth-child(3) { width: 9%; }
+  .detail-table-products th:nth-child(4), .detail-table-products td:nth-child(4) { width: 9%; }
+  .detail-table-products th:nth-child(5), .detail-table-products td:nth-child(5) { width: 18%; }
+  .detail-table-products th:nth-child(6), .detail-table-products td:nth-child(6) { width: 19%; }
+  .detail-table-products td.num { white-space: normal; }
 
   .detail-tax-note { font-size: 11.5px; }
   .detail-notes { font-size: 12.5px; }
@@ -1177,7 +1200,33 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .pf-col-bal { font-size: 12px; }
   .pf-pay-input { padding: 7px 8px; font-size: 13px; }
 
-  /* Detail payments table scrolls sideways for its extra column */
-  #view-event-detail .detail-table { min-width: 520px; }
-  .pay-for-cell { font-size: 11px; max-width: 160px; }
+  /* Both detail tables fit the screen (no sideways scroll). */
+  #view-event-detail .detail-table-products,
+  #view-event-detail .detail-table-payments { min-width: 0; width: 100%; }
+
+  /* Payments table: fixed layout, text wraps, compact action button. */
+  .detail-table-payments {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .detail-table-payments th,
+  .detail-table-payments td {
+    padding: 6px 3px;
+    font-size: 9.5px;
+    word-break: break-word;
+    white-space: normal;
+  }
+  .detail-table-payments th:nth-child(1), .detail-table-payments td:nth-child(1) { width: 16%; }
+  .detail-table-payments th:nth-child(2), .detail-table-payments td:nth-child(2) { width: 13%; }
+  .detail-table-payments th:nth-child(3), .detail-table-payments td:nth-child(3) { width: 17%; }
+  .detail-table-payments th:nth-child(4), .detail-table-payments td:nth-child(4) { width: 24%; }
+  .detail-table-payments th:nth-child(5), .detail-table-payments td:nth-child(5) { width: 17%; }
+  .detail-table-payments th:nth-child(6), .detail-table-payments td:nth-child(6) { width: 13%; }
+  .pay-for-cell { font-size: 9px; max-width: none; }
+
+  /* Shrink the receipt button to just its icon so the row fits */
+  .pay-actions { white-space: normal; }
+  .pay-receipt-label { display: none; }
+  .pay-receipt-btn { padding: 4px 6px; margin-right: 4px; font-size: 12px; }
+  .pay-del-btn { width: 22px; height: 22px; font-size: 12px; }
 }
