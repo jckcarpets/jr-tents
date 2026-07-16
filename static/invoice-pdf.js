@@ -229,9 +229,14 @@
 
     const R = PAGE_W - MARGIN;
     const now = new Date();
-    const todayStr = now.getFullYear() + '-' +
-      String(now.getMonth() + 1).padStart(2, '0') + '-' +
-      String(now.getDate()).padStart(2, '0');
+    // Day/month/year format for all dates on the quotation.
+    const fmtDMY = (iso) => {
+      const p = String(iso || '').split('-');
+      return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : String(iso || '');
+    };
+    const todayStr = String(now.getDate()).padStart(2, '0') + '/' +
+      String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+    const eventDateStr = ev.end_date ? fmtDMY(ev.date) + ' - ' + fmtDMY(ev.end_date) : fmtDMY(ev.date);
 
     // ---- RIGHT side: logo, with the address block stacked below it ----
     let rightBottom;
@@ -268,19 +273,18 @@
     const metaPairs = [
       ['Quotation #:', code, false],
       ['Date:', todayStr, true],
-      ['Event date:', formatDateRange(ev), true],
+      ['Event date:', eventDateStr, true],
     ];
     if (ev.category) metaPairs.push(['Category:', ev.category, false]);
     metaPairs.push(['Classification:', (ev.classification || 'retail').toUpperCase(), false]);
 
-    // Value column: right-align labels to a divider, values left-aligned after.
+    // Labels left-aligned; values start in a shared column after the widest label.
     let widestLabel = 0;
     metaPairs.forEach(([l]) => { widestLabel = Math.max(widestLabel, textWidth(l, 9.5, false)); });
-    const labelRight = MARGIN + widestLabel;
-    const valueX = labelRight + 6;
+    const valueX = MARGIN + widestLabel + 8;
     let metaY = metaTop + 16;
     metaPairs.forEach(([label, value, boldVal]) => {
-      doc.text(labelRight, metaY, label, 9.5, { color: GRAY, align: 'right' });
+      doc.text(MARGIN, metaY, label, 9.5, { color: GRAY });
       doc.text(valueX, metaY, String(value), 9.5, boldVal ? { bold: true, color: DARK } : { color: GRAY });
       metaY += 13;
     });
@@ -295,7 +299,8 @@
     doc.text(MARGIN, y, ev.client_name || ev.title || '', 13, { bold: true });
     y += 15;
     if (ev.location) {
-      doc.text(MARGIN, y, 'Event location: ' + ev.location, 9.5, { color: GRAY });
+      doc.text(MARGIN, y, 'Event location: ', 9.5, { color: GRAY });
+      doc.text(MARGIN + textWidth('Event location: ', 9.5, false), y, ev.location, 9.5, { bold: true, color: DARK });
       y += 15;
     }
     y += 10;
