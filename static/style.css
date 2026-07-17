@@ -916,23 +916,21 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
 
 /* ---------------- Event detail (read-only) page ---------------- */
 
+/* Two aligned columns (labels | values), whole block sitting on the right. */
 .detail-info {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  align-items: flex-end;   /* right-align the whole details group */
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 14px;
+  row-gap: 7px;
+  width: fit-content;
   margin-left: auto;
   margin-bottom: 6px;
-}
-
-.detail-info-row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
   font-size: 14.5px;
 }
 
-.detail-info-label { color: var(--text-muted); flex-shrink: 0; }
+.detail-info-row { display: contents; }
+
+.detail-info-label { color: var(--text-muted); text-align: left; }
 .detail-info-row span:last-child { font-weight: 600; text-align: right; }
 
 .detail-client { font-size: 16px; color: #1c1c1c; font-weight: 700; }
@@ -1150,12 +1148,12 @@ body.sidebar-collapsed .sidebar-toggle { display: flex; }
   .breadcrumb { margin: -12px -5px 18px -5px; padding: 12px 14px; font-size: 12.5px; }
   .form-heading { font-size: 16px; margin: 20px 0 10px 0; }
 
-  /* Details on phones: right-aligned group (label + value together on the
-     right). Values wrap if needed so nothing runs off the edge. */
-  .detail-info { max-width: 100%; width: auto; gap: 7px; margin-left: auto; margin-top: 4px; align-items: flex-end; }
-  .detail-info-row { font-size: 13px; gap: 10px; justify-content: flex-end; }
-  .detail-info-label { flex-shrink: 0; }
-  .detail-info-row span:last-child { word-break: break-word; text-align: right; min-width: 0; }
+  /* Details on phones: same two-column right-aligned grid, smaller text,
+     long values wrap so nothing runs off the edge. */
+  .detail-info { width: fit-content; max-width: 100%; margin-left: auto; margin-top: 4px;
+    column-gap: 10px; row-gap: 7px; font-size: 13px; }
+  .detail-info-label { text-align: left; }
+  .detail-info-row span:last-child { text-align: right; word-break: break-word; }
 
   .detail-client { font-size: 14px; }
 
