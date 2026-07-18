@@ -57,11 +57,30 @@ async function api(path, options) {
   return res.json();
 }
 
+const DATA_CACHE_KEY = 'jrtents_data_cache_v1';
+
 async function loadAll() {
   [clients, events] = await Promise.all([
     api('/api/clients'),
     api('/api/events'),
   ]);
+  // Remember the latest data on this device so the next open paints instantly
+  // (fresh data still replaces it in the background on every open).
+  try {
+    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ clients: clients, events: events }));
+  } catch (e) { /* storage unavailable — fine, app still works */ }
+}
+
+function loadFromCache() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DATA_CACHE_KEY));
+    if (d && Array.isArray(d.clients) && Array.isArray(d.events)) {
+      clients = d.clients;
+      events = d.events;
+      return true;
+    }
+  } catch (e) { /* corrupted — ignore */ }
+  return false;
 }
 
 // ---------------- Toast ----------------
@@ -1254,10 +1273,15 @@ document.getElementById('client-delete').addEventListener('click', async () => {
 // ---------------- Init ----------------
 
 (async function init() {
+  // Show the last saved entries immediately (no waiting on the server),
+  // then refresh with live data in the background.
+  const hadCache = loadFromCache();
+  if (hadCache) renderDashboard();
+
   try {
     await loadAll();
   } catch (e) {
-    toast('Could not load data: ' + e.message);
+    if (!hadCache) toast('Could not load data: ' + e.message);
   }
   renderDashboard();
 })();

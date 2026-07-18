@@ -3,7 +3,7 @@
 // the app shell fast. It deliberately never caches API responses, so your
 // data is always fresh from the server.
 
-const CACHE = 'jrtents-shell-v1';
+const CACHE = 'jrtents-shell-v2';
 const SHELL = [
   '/',
   '/static/style.css',
@@ -41,17 +41,21 @@ self.addEventListener('fetch', (event) => {
     return; // default browser handling (network)
   }
 
-  // App shell / static assets: cache-first, fall back to network.
+  // App shell / static assets: serve from cache instantly, refresh the cache
+  // in the background (stale-while-revalidate) so updates arrive next open.
   if (url.origin === self.location.origin &&
       (url.pathname.startsWith('/static/') || url.pathname === '/')) {
     event.respondWith(
-      caches.match(req).then((hit) =>
-        hit || fetch(req).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+      caches.match(req).then((hit) => {
+        const refresh = fetch(req).then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          }
           return res;
-        }).catch(() => hit)
-      )
+        }).catch(() => hit);
+        return hit || refresh;
+      })
     );
   }
 });
