@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 import sqlite3
 import os
 import random
@@ -146,6 +146,21 @@ def compute_totals(products, tax_inclusive, tax_type, discount_amount):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+# ---- PWA: manifest + service worker served from the root scope ----
+@app.route('/manifest.webmanifest')
+def manifest():
+    return send_from_directory('static', 'manifest.webmanifest',
+                               mimetype='application/manifest+json')
+
+
+@app.route('/sw.js')
+def service_worker():
+    resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
 
 
 # ---------- Clients ----------
