@@ -401,10 +401,18 @@ document.getElementById('event-popup').addEventListener('click', (e) => {
 
 document.getElementById('ep-more').addEventListener('click', () => {
   closeEventPopup();
-  // Use the background fetch (usually already finished by the time the
-  // user clicks More) so the detail page has the full product list.
-  const pending = popupFetch || Promise.resolve(popupEvent);
-  pending.then(ev => { if (ev) openEventDetail(ev); });
+  // Open the detail page INSTANTLY with the data we already have — the full
+  // record (products, payments) fills itself in when the background fetch
+  // arrives, instead of making the user wait on a slow server.
+  if (popupEvent) openEventDetail(popupEvent);
+  if (popupFetch) {
+    popupFetch.then(ev => {
+      const stillThere = ev && detailEvent && ev.id === detailEvent.id &&
+        !document.getElementById('view-event-detail').classList.contains('hidden');
+      if (stillThere) openEventDetail(ev);
+      else if (ev && !popupEvent) openEventDetail(ev);
+    });
+  }
 });
 
 function openEventDetail(ev) {
@@ -424,7 +432,11 @@ function openEventDetail(ev) {
   const products = ev.products || [];
   if (products.length === 0) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="6" style="color:var(--text-muted);">No products on this event.</td>';
+    // ev.products undefined = the full record is still on its way from the
+    // server; an actual empty list means the event truly has no products.
+    tr.innerHTML = ev.products
+      ? '<td colspan="6" style="color:var(--text-muted);">No products on this event.</td>'
+      : '<td colspan="6" style="color:var(--text-muted);">Loading products&hellip;</td>';
     tbody.appendChild(tr);
   } else {
     products.forEach(p => {
@@ -490,7 +502,9 @@ function renderDetailPayments(ev) {
 
   const tbody = document.getElementById('ed-payments-tbody');
   tbody.innerHTML = '';
-  document.getElementById('ed-payments-empty').classList.toggle('hidden', payments.length > 0);
+  const payEmpty = document.getElementById('ed-payments-empty');
+  payEmpty.textContent = ev.payments ? 'No payments recorded yet.' : 'Loading payments…';
+  payEmpty.classList.toggle('hidden', payments.length > 0);
   payments.forEach(p => {
     const tr = document.createElement('tr');
     tr.className = 'pay-row-clickable';
